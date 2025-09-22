@@ -7,6 +7,9 @@ import {
   type BTPayPalGetDeviceDataResult,
   type BTCardTokenizationNonceResult,
   type TokenizeCardOptions,
+  type ApplePayOptions,
+  type ApplePayNonceResult,
+  type ApplePayCanMakePaymentsOptions,
 } from './types';
 
 const LINKING_ERROR =
@@ -68,6 +71,73 @@ export async function tokenizeCardData(
   try {
     const result: BTCardTokenizationNonceResult =
       await ExpoBraintree.tokenizeCardData(options);
+    return result;
+  } catch (ex: unknown) {
+    return ex as BTPayPalError;
+  }
+}
+
+// Apple Pay Functions
+export async function isApplePayAvailable(): Promise<boolean> {
+  if (Platform.OS !== 'ios') {
+    return false;
+  }
+  try {
+    const result: boolean = await ExpoBraintree.isApplePayAvailable();
+    return result;
+  } catch (ex: unknown) {
+    return false;
+  }
+}
+
+export async function canMakeApplePayPayments(
+  options?: ApplePayCanMakePaymentsOptions
+): Promise<boolean> {
+  if (Platform.OS !== 'ios') {
+    return false;
+  }
+  try {
+    const result: boolean = await ExpoBraintree.canMakeApplePayPayments(
+      options || {}
+    );
+    return result;
+  } catch (ex: unknown) {
+    return false;
+  }
+}
+
+export async function presentApplePaymentSheet(
+  options: ApplePayOptions
+): Promise<ApplePayNonceResult | BTPayPalError> {
+  if (Platform.OS !== 'ios') {
+    return {
+      code: undefined,
+      message: 'Apple Pay is only available on iOS',
+      domain: undefined,
+    } as BTPayPalError;
+  }
+  try {
+    const result: ApplePayNonceResult =
+      await ExpoBraintree.presentApplePaymentSheet(options);
+    return result;
+  } catch (ex: unknown) {
+    return ex as BTPayPalError;
+  }
+}
+
+export async function tokenizeApplePayPayment(options: {
+  clientToken: string;
+}): Promise<ApplePayNonceResult | BTPayPalError> {
+  if (Platform.OS !== 'ios') {
+    return {
+      code: undefined,
+      message: 'Apple Pay is only available on iOS',
+      domain: undefined,
+    } as BTPayPalError;
+  }
+  try {
+    const result: ApplePayNonceResult =
+      await ExpoBraintree.tokenizeApplePayPayment(options);
     return result;
   } catch (ex: unknown) {
     return ex as BTPayPalError;
