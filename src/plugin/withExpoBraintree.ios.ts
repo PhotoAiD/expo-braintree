@@ -13,69 +13,144 @@ export const withExpoBraintreeAppDelegate: ConfigPlugin<
 > = (expoConfig, { xCodeProjectAppName }) => {
   return withAppDelegate(expoConfig, (config) => {
     const appDelegate = config.modResults;
+    const isSwift = appDelegate.language === 'swift';
     let contents = eol.split(appDelegate.contents);
-    // Step 1 Edit Import part
-    // Editing import part for -swift.h file to be able to use Braintree
-    const importSwiftHeaderFileContent = `#import "${xCodeProjectAppName}-Swift.h"`;
-    const importSwiftHeaderFileIndex = contents.findIndex((content) =>
-      content.includes(importSwiftHeaderFileContent)
-    );
-    // If importSwiftHeaderFileContent do not exist in AppDelegate.mm
-    if (!~importSwiftHeaderFileIndex) {
-      contents = [importSwiftHeaderFileContent, ...contents];
-    }
-    const importExpoModulesSwiftHeader = `#import "ExpoModulesCore-Swift.h"`;
-    const importExpoModulesSwiftHeaderFileIndex = contents.findIndex(
-      (content) => content.includes(importExpoModulesSwiftHeader)
-    );
-    // If importExpoModulesSwiftHeader do not exist in AppDelegate.mm
-    if (!~importExpoModulesSwiftHeaderFileIndex) {
-      contents = [importExpoModulesSwiftHeader, ...contents];
-    }
-    // Step 2 Add configure method in didFinishLaunchingWithOptions
-    const didFinishLaunchingWithOptions = 'didFinishLaunchingWithOptions';
-    const expoBraintreeConfigureLine = '  [BraintreeExpoConfig configure];';
-    let didFinishLaunchingWithOptionsElementIndex = contents.findIndex(
-      (content) => content.includes(didFinishLaunchingWithOptions)
-    );
-    const expoBraintreeConfigureLineIndex = contents.findIndex((content) =>
-      content.includes(expoBraintreeConfigureLine)
-    );
-    // If didFinishLaunchingWithOptions exist in AppDelegate.mm and expoBraintreeConfigureLine do not exist
-    if (
-      !~expoBraintreeConfigureLineIndex &&
-      !!~didFinishLaunchingWithOptionsElementIndex
-    ) {
-      contents.splice(
-        // We are adding +2 to the index to insert content after '{' block
-        didFinishLaunchingWithOptionsElementIndex + 2,
-        0,
-        expoBraintreeConfigureLine
+
+    if (isSwift) {
+      // Handle Swift AppDelegate
+      // Step 1: Remove any Objective-C imports that may have been added
+      contents = contents.filter(
+        (line) =>
+          !line.includes('#import "ExpoModulesCore-Swift.h"') &&
+          !line.includes('#import "undefined-Swift.h"') &&
+          !line.includes(`#import "${xCodeProjectAppName}-Swift.h"`)
       );
-    }
-    // Step 3 Add method to properly handle openUrl method in AppDelegate.m
-    const openUrlMethod =
-      '- (BOOL)application:(UIApplication *)application openURL';
-    const expoBraintreeOpenUrlLines = [
-      '  if ([url.scheme localizedCaseInsensitiveCompare:[BraintreeExpoConfig getPaymentUrlScheme]] == NSOrderedSame) {',
-      '    return [BraintreeExpoConfig handleUrl:url];',
-      '  }',
-    ];
-    const openUrlMethodElementIndex = contents.findIndex((content) =>
-      content.includes(openUrlMethod)
-    );
-    const expoBraintreeOpenUrlLineIndex = contents.findIndex((content) =>
-      content.includes(expoBraintreeOpenUrlLines?.[0] ?? '')
-    );
-    // If openUrlMethodElementIndex exist in AppDelegate.mm and expoBraintreeOpenUrlLineIndex do not exist
-    if (!~expoBraintreeOpenUrlLineIndex && !!~openUrlMethodElementIndex) {
-      contents.splice(
-        // We are adding +1 to the index to insert content after '{' block
-        openUrlMethodElementIndex + 1,
-        0,
-        ...expoBraintreeOpenUrlLines
+
+      // Step 2: Add configure method in didFinishLaunchingWithOptions
+      const didFinishLaunchingWithOptions = 'didFinishLaunchingWithOptions';
+      const expoBraintreeConfigureLineSwift =
+        '    BraintreeExpoConfig.configure()';
+      const expoBraintreeConfigureLineObjC =
+        '  [BraintreeExpoConfig configure];';
+
+      let didFinishLaunchingWithOptionsElementIndex = contents.findIndex(
+        (content) => content.includes(didFinishLaunchingWithOptions)
       );
+
+      // Remove any existing Objective-C style configuration
+      const objCConfigIndex = contents.findIndex(
+        (content) =>
+          content.includes(expoBraintreeConfigureLineObjC) ||
+          content.includes('[BraintreeExpoConfig configure]')
+      );
+      if (~objCConfigIndex) {
+        contents.splice(objCConfigIndex, 1);
+      }
+
+      const swiftConfigIndex = contents.findIndex((content) =>
+        content.includes(expoBraintreeConfigureLineSwift)
+      );
+
+      // If didFinishLaunchingWithOptions exist and Swift configure line doesn't exist
+      if (!~swiftConfigIndex && !!~didFinishLaunchingWithOptionsElementIndex) {
+        contents.splice(
+          // We are adding +2 to the index to insert content after '{' block
+          didFinishLaunchingWithOptionsElementIndex + 2,
+          0,
+          expoBraintreeConfigureLineSwift
+        );
+      }
+
+      // Step 3: Add method to properly handle openUrl method in Swift
+      const openUrlMethod = 'open url: URL';
+      const expoBraintreeOpenUrlLinesSwift = [
+        '    if url.scheme?.localizedCaseInsensitiveCompare(BraintreeExpoConfig.getPaymentUrlScheme()) == .orderedSame {',
+        '      return BraintreeExpoConfig.handleUrl(url: url)',
+        '    }',
+      ];
+
+      const openUrlMethodElementIndex = contents.findIndex((content) =>
+        content.includes(openUrlMethod)
+      );
+      const expoBraintreeOpenUrlLineIndex = contents.findIndex((content) =>
+        content.includes(expoBraintreeOpenUrlLinesSwift?.[0] ?? '')
+      );
+
+      // If openUrlMethod exists and Braintree handling doesn't exist
+      if (!~expoBraintreeOpenUrlLineIndex && !!~openUrlMethodElementIndex) {
+        contents.splice(
+          // We are adding +1 to the index to insert content after '{' block
+          openUrlMethodElementIndex + 1,
+          0,
+          ...expoBraintreeOpenUrlLinesSwift
+        );
+      }
+    } else {
+      // Handle Objective-C AppDelegate (existing logic)
+      // Step 1 Edit Import part
+      // Editing import part for -swift.h file to be able to use Braintree
+      const importSwiftHeaderFileContent = `#import "${xCodeProjectAppName}-Swift.h"`;
+      const importSwiftHeaderFileIndex = contents.findIndex((content) =>
+        content.includes(importSwiftHeaderFileContent)
+      );
+      // If importSwiftHeaderFileContent do not exist in AppDelegate.mm
+      if (!~importSwiftHeaderFileIndex) {
+        contents = [importSwiftHeaderFileContent, ...contents];
+      }
+      const importExpoModulesSwiftHeader = `#import "ExpoModulesCore-Swift.h"`;
+      const importExpoModulesSwiftHeaderFileIndex = contents.findIndex(
+        (content) => content.includes(importExpoModulesSwiftHeader)
+      );
+      // If importExpoModulesSwiftHeader do not exist in AppDelegate.mm
+      if (!~importExpoModulesSwiftHeaderFileIndex) {
+        contents = [importExpoModulesSwiftHeader, ...contents];
+      }
+      // Step 2 Add configure method in didFinishLaunchingWithOptions
+      const didFinishLaunchingWithOptions = 'didFinishLaunchingWithOptions';
+      const expoBraintreeConfigureLine = '  [BraintreeExpoConfig configure];';
+      let didFinishLaunchingWithOptionsElementIndex = contents.findIndex(
+        (content) => content.includes(didFinishLaunchingWithOptions)
+      );
+      const expoBraintreeConfigureLineIndex = contents.findIndex((content) =>
+        content.includes(expoBraintreeConfigureLine)
+      );
+      // If didFinishLaunchingWithOptions exist in AppDelegate.mm and expoBraintreeConfigureLine do not exist
+      if (
+        !~expoBraintreeConfigureLineIndex &&
+        !!~didFinishLaunchingWithOptionsElementIndex
+      ) {
+        contents.splice(
+          // We are adding +2 to the index to insert content after '{' block
+          didFinishLaunchingWithOptionsElementIndex + 2,
+          0,
+          expoBraintreeConfigureLine
+        );
+      }
+      // Step 3 Add method to properly handle openUrl method in AppDelegate.m
+      const openUrlMethod =
+        '- (BOOL)application:(UIApplication *)application openURL';
+      const expoBraintreeOpenUrlLines = [
+        '  if ([url.scheme localizedCaseInsensitiveCompare:[BraintreeExpoConfig getPaymentUrlScheme]] == NSOrderedSame) {',
+        '    return [BraintreeExpoConfig handleUrl:url];',
+        '  }',
+      ];
+      const openUrlMethodElementIndex = contents.findIndex((content) =>
+        content.includes(openUrlMethod)
+      );
+      const expoBraintreeOpenUrlLineIndex = contents.findIndex((content) =>
+        content.includes(expoBraintreeOpenUrlLines?.[0] ?? '')
+      );
+      // If openUrlMethodElementIndex exist in AppDelegate.mm and expoBraintreeOpenUrlLineIndex do not exist
+      if (!~expoBraintreeOpenUrlLineIndex && !!~openUrlMethodElementIndex) {
+        contents.splice(
+          // We are adding +1 to the index to insert content after '{' block
+          openUrlMethodElementIndex + 1,
+          0,
+          ...expoBraintreeOpenUrlLines
+        );
+      }
     }
+
     config.modResults.contents = contents.join('\n');
     return config;
   });
