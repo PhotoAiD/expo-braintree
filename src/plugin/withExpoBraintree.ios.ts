@@ -69,21 +69,31 @@ export const withExpoBraintreeAppDelegate: ConfigPlugin<
         '    }',
       ];
 
-      const openUrlMethodElementIndex = contents.findIndex((content) =>
+      // Find the openURL method
+      let openUrlMethodElementIndex = contents.findIndex((content) =>
         content.includes(openUrlMethod)
       );
-      const expoBraintreeOpenUrlLineIndex = contents.findIndex((content) =>
-        content.includes(expoBraintreeOpenUrlLinesSwift?.[0] ?? '')
-      );
 
-      // If openUrlMethod exists and Braintree handling doesn't exist
-      if (!~expoBraintreeOpenUrlLineIndex && !!~openUrlMethodElementIndex) {
-        contents.splice(
-          // We are adding +1 to the index to insert content after '{' block
-          openUrlMethodElementIndex + 1,
-          0,
-          ...expoBraintreeOpenUrlLinesSwift
+      // If we found the method signature, look for the opening brace
+      if (openUrlMethodElementIndex !== -1) {
+        // Find the opening brace of the function body after the method signature
+        let braceIndex = -1;
+        for (let i = openUrlMethodElementIndex; i < contents.length; i++) {
+          const line = contents[i];
+          if (line && line.includes('{')) {
+            braceIndex = i;
+            break;
+          }
+        }
+
+        const expoBraintreeOpenUrlLineIndex = contents.findIndex((content) =>
+          content.includes('BraintreeExpoConfig.getPaymentUrlScheme()')
         );
+
+        // If openUrlMethod exists and Braintree handling doesn't exist
+        if (!~expoBraintreeOpenUrlLineIndex && braceIndex !== -1) {
+          contents.splice(braceIndex + 1, 0, ...expoBraintreeOpenUrlLinesSwift);
+        }
       }
     } else {
       // Handle Objective-C AppDelegate (existing logic)
