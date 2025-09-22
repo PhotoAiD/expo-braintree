@@ -6,7 +6,6 @@
 //
 
 import Braintree
-import BraintreeApplePay
 import Foundation
 import PassKit
 
@@ -143,26 +142,19 @@ class BTApplePayHelper: NSObject {
         "isDefault": nonce.isDefault
       ]
 
-      // Add bin data if available
-      if let binData = nonce.binData {
-        var binInfo: [String: Any] = [:]
-        binInfo["prepaid"] = binData.prepaid ?? "Unknown"
-        binInfo["healthcare"] = binData.healthcare ?? "Unknown"
-        binInfo["debit"] = binData.debit ?? "Unknown"
-        binInfo["durbinRegulated"] = binData.durbinRegulated ?? "Unknown"
-        binInfo["commercial"] = binData.commercial ?? "Unknown"
-        binInfo["payroll"] = binData.payroll ?? "Unknown"
-        if let countryOfIssuance = binData.countryOfIssuance {
-          binInfo["countryOfIssuance"] = countryOfIssuance
-        }
-        if let issuingBank = binData.issuingBank {
-          binInfo["issuingBank"] = issuingBank
-        }
-        if let productId = binData.productID {
-          binInfo["productId"] = productId
-        }
-        response["binData"] = binInfo
-      }
+      // Add bin data
+      let binData = nonce.binData
+      var binInfo: [String: Any] = [:]
+      binInfo["prepaid"] = binData.prepaid ?? "Unknown"
+      binInfo["healthcare"] = binData.healthcare ?? "Unknown"
+      binInfo["debit"] = binData.debit ?? "Unknown"
+      binInfo["durbinRegulated"] = binData.durbinRegulated ?? "Unknown"
+      binInfo["commercial"] = binData.commercial ?? "Unknown"
+      binInfo["payroll"] = binData.payroll ?? "Unknown"
+      binInfo["countryOfIssuance"] = binData.countryOfIssuance
+      binInfo["issuingBank"] = binData.issuingBank
+      binInfo["productId"] = binData.productID
+      response["binData"] = binInfo
 
       // Add payment information from PKPayment
       if let token = payment.token as PKPaymentToken? {

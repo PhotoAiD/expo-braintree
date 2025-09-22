@@ -6,7 +6,6 @@
 //
 
 import Braintree
-import BraintreeApplePay
 import Foundation
 import PassKit
 import React
@@ -339,6 +338,7 @@ class ExpoBraintree: NSObject {
   // Properties to store promise callbacks for Apple Pay
   private var applePayResolve: RCTPromiseResolveBlock?
   private var applePayReject: RCTPromiseRejectBlock?
+  private var applePayClientToken: String?
 
 }
 
@@ -384,10 +384,16 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
           ERROR_TYPES.APPLE_PAY_TOKENIZATION_ERROR.rawValue,
           error
         )
+        // Clear callbacks immediately after use
+        self?.applePayResolve = nil
+        self?.applePayReject = nil
       } else if let response = response {
         let result = PKPaymentAuthorizationResult(status: .success, errors: nil)
         completion(result)
         self?.applePayResolve?(response)
+        // Clear callbacks immediately after use
+        self?.applePayResolve = nil
+        self?.applePayReject = nil
       } else {
         let result = PKPaymentAuthorizationResult(status: .failure, errors: nil)
         completion(result)
@@ -396,6 +402,9 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
           ERROR_TYPES.APPLE_PAY_TOKENIZATION_ERROR.rawValue,
           NSError(domain: ERROR_TYPES.APPLE_PAY_TOKENIZATION_ERROR.rawValue, code: -1)
         )
+        // Clear callbacks immediately after use
+        self?.applePayResolve = nil
+        self?.applePayReject = nil
       }
     }
   }
@@ -416,8 +425,5 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
       self.applePayClientToken = nil
     }
   }
-
-  // Property to store client token for Apple Pay
-  private var applePayClientToken: String?
 
 }
