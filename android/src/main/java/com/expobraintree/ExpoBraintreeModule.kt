@@ -185,7 +185,7 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     }
   }
 
-  override fun onNewIntent(intent: Intent?) {
+  override fun onNewIntent(intent: Intent) {
     if (this::currentActivityRef.isInitialized) {
       currentActivityRef.setIntent(intent)
     }
@@ -199,9 +199,9 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   override fun onHostPause() {}
   override fun onHostDestroy() {}
   override fun onActivityResult(
-      activity: Activity?,
+      activity: Activity,
       requestCode: Int,
       resultCode: Int,
-      intent: Intent?
+      data: Intent?
   ) {}
 }

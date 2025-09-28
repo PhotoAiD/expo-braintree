@@ -135,7 +135,7 @@ class PaypalDataConverter {
         card.setCvv(options.getString("cvv"))
       }
       if (options.hasKey("postalCode")) {
-        card.setCvv(options.getString("postalCode"))
+        card.setPostalCode(options.getString("postalCode"))
       }
       return card
     }
