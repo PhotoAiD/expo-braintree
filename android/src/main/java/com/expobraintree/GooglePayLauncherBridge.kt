@@ -1,12 +1,10 @@
 package com.expobraintree
 
-import androidx.activity.ComponentActivity
 import com.braintreepayments.api.googlepay.GooglePayLauncher
 import com.braintreepayments.api.googlepay.GooglePayPaymentAuthRequest
-import com.braintreepayments.api.googlepay.GooglePayPaymentAuthResult
 
 interface GooglePayLauncherBridge {
-    fun launch(activity: ComponentActivity, paymentAuthRequest: GooglePayPaymentAuthRequest.ReadyToLaunch)
+    fun launch(paymentAuthRequest: GooglePayPaymentAuthRequest.ReadyToLaunch)
 
     companion object {
         private var instance: GooglePayLauncherBridge? = null
@@ -23,7 +21,7 @@ class GooglePayLauncherBridgeImpl(
     private val launcher: GooglePayLauncher
 ) : GooglePayLauncherBridge {
 
-    override fun launch(activity: ComponentActivity, paymentAuthRequest: GooglePayPaymentAuthRequest.ReadyToLaunch) {
-        launcher.launch(activity, paymentAuthRequest)
+    override fun launch(paymentAuthRequest: GooglePayPaymentAuthRequest.ReadyToLaunch) {
+        launcher.launch(paymentAuthRequest)
     }
 }

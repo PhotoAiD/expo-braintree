@@ -318,7 +318,7 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
               when (paymentAuthRequest) {
                 is GooglePayPaymentAuthRequest.ReadyToLaunch -> {
                   // Launch Google Pay flow
-                  launcherBridge.launch(currentActivityRef, paymentAuthRequest)
+                  launcherBridge.launch(paymentAuthRequest)
                 }
                 is GooglePayPaymentAuthRequest.Failure -> {
                   handleGooglePayError(paymentAuthRequest.error)
@@ -331,6 +331,13 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
               EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
               ERROR_TYPES.GOOGLE_PAY_NOT_AVAILABLE.value,
               PaypalDataConverter.createError(EXCEPTION_TYPES.KOTLIN_EXCEPTION.value, "Google Pay not available")
+            )
+          }
+          null -> {
+            promiseRef.reject(
+              EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
+              ERROR_TYPES.GOOGLE_PAY_NOT_AVAILABLE.value,
+              PaypalDataConverter.createError(EXCEPTION_TYPES.KOTLIN_EXCEPTION.value, "Google Pay readiness check failed")
             )
           }
         }

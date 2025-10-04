@@ -5,10 +5,10 @@ import com.braintreepayments.api.paypal.PayPalCheckoutRequest
 import com.braintreepayments.api.paypal.PayPalPaymentIntent
 import com.braintreepayments.api.paypal.PayPalVaultRequest
 import com.braintreepayments.api.core.PostalAddress
+import com.braintreepayments.api.core.PaymentMethodNonce
 import com.braintreepayments.api.card.Card;
 import com.braintreepayments.api.card.CardNonce;
 import com.braintreepayments.api.googlepay.GooglePayRequest
-import com.braintreepayments.api.googlepay.GooglePayNonce
 import com.braintreepayments.api.googlepay.GooglePayTotalPriceStatus
 
 import com.facebook.react.bridge.Arguments
@@ -177,28 +177,12 @@ class PaypalDataConverter {
       return request
     }
 
-    fun createGooglePayNonceResult(googlePayNonce: GooglePayNonce): WritableMap {
+    fun createGooglePayNonceResult(googlePayNonce: PaymentMethodNonce): WritableMap {
       val result: WritableMap = Arguments.createMap()
       result.putString("nonce", googlePayNonce.string)
-      result.putString("type", googlePayNonce.type)
-      result.putString("description", googlePayNonce.description)
+      result.putString("type", "GooglePay")
+      result.putString("description", googlePayNonce.string)
       result.putBoolean("isDefault", googlePayNonce.isDefault)
-
-      googlePayNonce.cardNetwork?.let {
-        result.putString("cardNetwork", it)
-      }
-
-      googlePayNonce.email?.let {
-        result.putString("email", it)
-      }
-
-      googlePayNonce.shippingAddress?.let {
-        result.putMap("shippingAddress", convertAddressData(it))
-      }
-
-      googlePayNonce.billingAddress?.let {
-        result.putMap("billingAddress", convertAddressData(it))
-      }
 
       return result
     }

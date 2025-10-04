@@ -2,8 +2,8 @@ package com.expobraintree
 
 import com.braintreepayments.api.paypal.PayPalAccountNonce
 import com.braintreepayments.api.core.UserCanceledException
+import com.braintreepayments.api.core.PaymentMethodNonce
 import com.braintreepayments.api.card.CardNonce
-import com.braintreepayments.api.googlepay.GooglePayNonce
 
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.bridge.Promise
@@ -94,7 +94,7 @@ class PaypalRebornModuleHandlers {
     }
   }
 
-  public fun onGooglePaySuccessHandler(googlePayNonce: GooglePayNonce, mPromise: Promise) {
+  public fun onGooglePaySuccessHandler(googlePayNonce: PaymentMethodNonce, mPromise: Promise) {
     val result: WritableMap = PaypalDataConverter.createGooglePayNonceResult(googlePayNonce)
     mPromise.resolve(result)
   }
