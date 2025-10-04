@@ -54,31 +54,54 @@ export const addPaypalIntentFilter = (
     isIntentCategoryBrowsableExist,
     isIntentCategoryDefaultExist,
     isIntentDataBraintreeExist,
+    isIntentDataAppLinkExist,
   } = checkAndroidManifestData(intentFilters);
 
+  // Add deep link intent filter (fallback for v5)
   if (
-    isIntentActionExist &&
-    isIntentCategoryBrowsableExist &&
-    isIntentCategoryDefaultExist &&
-    isIntentDataBraintreeExist
+    !isIntentActionExist ||
+    !isIntentCategoryBrowsableExist ||
+    !isIntentCategoryDefaultExist ||
+    !isIntentDataBraintreeExist
   ) {
-    console.warn(
-      'withExpoBraintreeAndroid: AndroidManifest not require any changes'
-    );
-    return modResults;
+    intentFilters.push({
+      action: [
+        {
+          $: { 'android:name': intentActionView },
+        },
+      ],
+      category: [
+        { $: { 'android:name': intentCategoryDefault } },
+        { $: { 'android:name': intentCategoryBrowsable } },
+      ],
+      data: [{ $: { 'android:scheme': '${applicationId}.braintree' } }],
+    });
   }
-  intentFilters.push({
-    action: [
-      {
-        $: { 'android:name': intentActionView },
-      },
-    ],
-    category: [
-      { $: { 'android:name': intentCategoryDefault } },
-      { $: { 'android:name': intentCategoryBrowsable } },
-    ],
-    data: [{ $: { 'android:scheme': '${applicationId}.braintree' } }],
-  });
+
+  // Add App Link intent filter for v5 (HTTPS scheme)
+  if (!isIntentDataAppLinkExist) {
+    intentFilters.push({
+      action: [
+        {
+          $: { 'android:name': intentActionView },
+        },
+      ],
+      category: [
+        { $: { 'android:name': intentCategoryDefault } },
+        { $: { 'android:name': intentCategoryBrowsable } },
+      ],
+      data: [
+        {
+          $: {
+            'android:scheme': 'https',
+            'android:host': 'photoaid.com',
+            'android:pathPrefix': '/braintree/return',
+          },
+        },
+      ],
+    });
+  }
+
   return modResults;
 };
 
@@ -105,6 +128,12 @@ const checkAndroidManifestData = (
     intentDataBraintree,
     'data'
   ),
+  isIntentDataAppLinkExist: isAppLinkInAndroidManifestExist(
+    intentFilters,
+    'https',
+    'photoaid.com',
+    '/braintree/return'
+  ),
 });
 
 const isElementInAndroidManifestExist = (
@@ -122,5 +151,22 @@ const isElementInAndroidManifestExist = (
           const typedItem = item as ManifestData;
           return typedItem.$['android:scheme'] === value;
       }
+    })
+  );
+
+const isAppLinkInAndroidManifestExist = (
+  intentFilters: AndroidConfig.Manifest.ManifestIntentFilter[] | undefined,
+  scheme: string,
+  host: string,
+  pathPrefix: string
+) =>
+  !!intentFilters?.some((intentFilter) =>
+    intentFilter.data?.find((item) => {
+      const typedItem = item as ManifestData;
+      return (
+        typedItem.$['android:scheme'] === scheme &&
+        typedItem.$['android:host'] === host &&
+        typedItem.$['android:pathPrefix'] === pathPrefix
+      );
     })
   );

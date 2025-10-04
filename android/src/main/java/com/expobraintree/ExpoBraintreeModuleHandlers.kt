@@ -1,8 +1,8 @@
 package com.expobraintree
 
-import com.braintreepayments.api.PayPalAccountNonce
-import com.braintreepayments.api.UserCanceledException
-import com.braintreepayments.api.CardNonce
+import com.braintreepayments.api.paypal.PayPalAccountNonce
+import com.braintreepayments.api.core.UserCanceledException
+import com.braintreepayments.api.card.CardNonce
 
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.bridge.Promise

@@ -90,8 +90,8 @@ dependencies {
   //noinspection GradleDynamicVersion
   implementation "com.facebook.react:react-native:+"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-  implementation 'com.braintreepayments.api:data-collector:4.41.0'
-  implementation 'com.braintreepayments.api:paypal:4.41.0'
-  implementation 'com.braintreepayments.api:card:4.41.0'
+  implementation 'com.braintreepayments.api:data-collector:5.17.0'
+  implementation 'com.braintreepayments.api:paypal:5.17.0'
+  implementation 'com.braintreepayments.api:card:5.17.0'
 }
 

@@ -53,6 +53,18 @@ export async function requestOneTimePayment(
   }
 }
 
+export async function handlePayPalReturnToApp(): Promise<
+  BTPayPalAccountNonceResult | BTPayPalError
+> {
+  try {
+    const result: BTPayPalAccountNonceResult =
+      await ExpoBraintree.handlePayPalReturnToApp();
+    return result;
+  } catch (ex: unknown) {
+    return ex as BTPayPalError;
+  }
+}
+
 export async function getDeviceDataFromDataCollector(
   clientToken: string
 ): Promise<BTPayPalGetDeviceDataResult | BTPayPalError> {

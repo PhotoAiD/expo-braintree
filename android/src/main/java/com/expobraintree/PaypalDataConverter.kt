@@ -1,12 +1,12 @@
 package com.expobraintree
 
-import com.braintreepayments.api.PayPalAccountNonce
-import com.braintreepayments.api.PayPalCheckoutRequest
-import com.braintreepayments.api.PayPalPaymentIntent
-import com.braintreepayments.api.PayPalVaultRequest
-import com.braintreepayments.api.PostalAddress
-import com.braintreepayments.api.Card;
-import com.braintreepayments.api.CardNonce;
+import com.braintreepayments.api.paypal.PayPalAccountNonce
+import com.braintreepayments.api.paypal.PayPalCheckoutRequest
+import com.braintreepayments.api.paypal.PayPalPaymentIntent
+import com.braintreepayments.api.paypal.PayPalVaultRequest
+import com.braintreepayments.api.core.PostalAddress
+import com.braintreepayments.api.card.Card;
+import com.braintreepayments.api.card.CardNonce;
 
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
@@ -47,10 +47,11 @@ class PaypalDataConverter {
       } else {
         result.putString("cardNetwork", cardNonce.cardType)
       }
-      result.putString("lastFour", cardNonce.getLastFour())
-      result.putString("lastTwo", cardNonce.getLastTwo())
-      result.putString("expirationMonth", cardNonce.getExpirationMonth())
-      result.putString("expirationYear", cardNonce.getExpirationYear())
+      // V5: Properties instead of getters
+      result.putString("lastFour", cardNonce.lastFour)
+      result.putString("lastTwo", cardNonce.lastTwo)
+      result.putString("expirationMonth", cardNonce.expirationMonth)
+      result.putString("expirationYear", cardNonce.expirationYear)
       return result
     }
 
@@ -62,20 +63,23 @@ class PaypalDataConverter {
     }
 
     fun createVaultRequest(options: ReadableMap): PayPalVaultRequest {
-      val request: PayPalVaultRequest = PayPalVaultRequest()
+      // V5: Constructor requires hasUserLocationConsent
+      val request: PayPalVaultRequest = PayPalVaultRequest(hasUserLocationConsent = false)
+
+      // V5: Direct property assignment instead of setters
       if (options.hasKey("billingAgreementDescription")) {
-        request.setBillingAgreementDescription(options.getString("billingAgreementDescription"))
+        request.billingAgreementDescription = options.getString("billingAgreementDescription")
       }
       if (options.hasKey("localeCode")) {
-        request.setLocaleCode(options.getString("localeCode"))
+        request.localeCode = options.getString("localeCode")
       }
       if (options.hasKey("displayName")) {
-        request.setDisplayName(options.getString("displayName"))
+        request.displayName = options.getString("displayName")
       }
       if (options.hasKey("offerCredit")) {
         val offerCredit: String = options.getString("offerCredit") ?: ""
         when (offerCredit) {
-          "true" -> request.setShouldOfferCredit(true)
+          "true" -> request.shouldOfferCredit = true
         }
       }
       if (options.hasKey("isShippingAddressRequired")) {
@@ -87,20 +91,32 @@ class PaypalDataConverter {
       if (options.hasKey("isShippingAddressEditable")) {
         val isShippingAddressEditable: String = options.getString("isShippingAddressEditable") ?: ""
         when (isShippingAddressEditable) {
-          "true" -> request.setShippingAddressEditable(true)
+          "true" -> request.isShippingAddressEditable = true
         }
       }
       return request
     }
 
     fun createCheckoutRequest(options: ReadableMap): PayPalCheckoutRequest {
-      val request = PayPalCheckoutRequest(options.getString("amount") ?: "")
-      if (options.hasKey("billingAgreementDescription")) request.billingAgreementDescription = options.getString("billingAgreementDescription")
-      if (options.hasKey("localeCode")) request.localeCode = options.getString("localeCode")
-        ?: "en-US"
-      if (options.hasKey("displayName")) request.displayName = options.getString("displayName")
-      if (options.hasKey("userAction")) request.userAction = options.getString("userAction")
-        ?: "none"
+      // V5: Constructor requires amount and hasUserLocationConsent
+      val request = PayPalCheckoutRequest(
+        amount = options.getString("amount") ?: "",
+        hasUserLocationConsent = false
+      )
+
+      // V5: Direct property assignment
+      if (options.hasKey("billingAgreementDescription")) {
+        request.billingAgreementDescription = options.getString("billingAgreementDescription")
+      }
+      if (options.hasKey("localeCode")) {
+        request.localeCode = options.getString("localeCode") ?: "en-US"
+      }
+      if (options.hasKey("displayName")) {
+        request.displayName = options.getString("displayName")
+      }
+      if (options.hasKey("currencyCode")) {
+        request.currencyCode = options.getString("currencyCode")
+      }
       if (options.hasKey("isShippingAddressRequired")) {
         val isShippingAddressRequired: String = options.getString("isShippingAddressRequired") ?: ""
         when (isShippingAddressRequired) {
@@ -121,21 +137,22 @@ class PaypalDataConverter {
     }
 
     fun createTokenizeCardRequest(options: ReadableMap): Card {
+      // V5: Direct property assignment instead of setters
       val card: Card = Card()
       if (options.hasKey("number")) {
-        card.setNumber(options.getString("number"))
+        card.number = options.getString("number")
       }
       if (options.hasKey("expirationMonth")) {
-        card.setExpirationMonth(options.getString("expirationMonth"))
+        card.expirationMonth = options.getString("expirationMonth")
       }
       if (options.hasKey("expirationYear")) {
-        card.setExpirationYear(options.getString("expirationYear"))
+        card.expirationYear = options.getString("expirationYear")
       }
       if (options.hasKey("cvv")) {
-        card.setCvv(options.getString("cvv"))
+        card.cvv = options.getString("cvv")
       }
       if (options.hasKey("postalCode")) {
-        card.setPostalCode(options.getString("postalCode"))
+        card.postalCode = options.getString("postalCode")
       }
       return card
     }
