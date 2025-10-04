@@ -7,6 +7,9 @@ import com.braintreepayments.api.paypal.PayPalVaultRequest
 import com.braintreepayments.api.core.PostalAddress
 import com.braintreepayments.api.card.Card;
 import com.braintreepayments.api.card.CardNonce;
+import com.braintreepayments.api.googlepay.GooglePayRequest
+import com.braintreepayments.api.googlepay.GooglePayNonce
+import com.braintreepayments.api.googlepay.GooglePayTotalPriceStatus
 
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
@@ -157,6 +160,48 @@ class PaypalDataConverter {
       return card
     }
 
+    fun createGooglePayRequest(options: ReadableMap): GooglePayRequest {
+      val amount = options.getString("amount") ?: ""
+      val currencyCode = options.getString("currencyCode") ?: "USD"
+
+      val request = GooglePayRequest(
+        currencyCode = currencyCode,
+        totalPrice = amount,
+        totalPriceStatus = GooglePayTotalPriceStatus.TOTAL_PRICE_STATUS_FINAL
+      )
+
+      if (options.hasKey("merchantName")) {
+        request.googleMerchantName = options.getString("merchantName")
+      }
+
+      return request
+    }
+
+    fun createGooglePayNonceResult(googlePayNonce: GooglePayNonce): WritableMap {
+      val result: WritableMap = Arguments.createMap()
+      result.putString("nonce", googlePayNonce.string)
+      result.putString("type", googlePayNonce.type)
+      result.putString("description", googlePayNonce.description)
+      result.putBoolean("isDefault", googlePayNonce.isDefault)
+
+      googlePayNonce.cardNetwork?.let {
+        result.putString("cardNetwork", it)
+      }
+
+      googlePayNonce.email?.let {
+        result.putString("email", it)
+      }
+
+      googlePayNonce.shippingAddress?.let {
+        result.putMap("shippingAddress", convertAddressData(it))
+      }
+
+      googlePayNonce.billingAddress?.let {
+        result.putMap("billingAddress", convertAddressData(it))
+      }
+
+      return result
+    }
 
   }
 }

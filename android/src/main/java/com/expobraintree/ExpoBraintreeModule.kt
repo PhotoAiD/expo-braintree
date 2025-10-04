@@ -19,6 +19,12 @@ import com.braintreepayments.api.paypal.PayPalPendingRequest
 import com.braintreepayments.api.paypal.PayPalPaymentAuthRequest
 import com.braintreepayments.api.paypal.PayPalPaymentAuthResult
 import com.braintreepayments.api.paypal.PayPalResult
+import com.braintreepayments.api.googlepay.GooglePayClient
+import com.braintreepayments.api.googlepay.GooglePayRequest
+import com.braintreepayments.api.googlepay.GooglePayPaymentAuthRequest
+import com.braintreepayments.api.googlepay.GooglePayPaymentAuthResult
+import com.braintreepayments.api.googlepay.GooglePayResult
+import com.braintreepayments.api.googlepay.GooglePayReadinessResult
 import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
@@ -36,6 +42,7 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   private var payPalClientRef: PayPalClient? = null
   private var cardClientRef: CardClient? = null
   private var dataCollectorRef: DataCollector? = null
+  private var googlePayClientRef: GooglePayClient? = null
   private var pendingPayPalRequest: String? = null
   private val paypalRebornModuleHandlers: PaypalRebornModuleHandlers = PaypalRebornModuleHandlers()
 
@@ -247,6 +254,121 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     if (cardNonce != null) {
       paypalRebornModuleHandlers.onCardTokenizeSuccessHandler(cardNonce, promiseRef)
     }
+  }
+
+  @ReactMethod
+  fun isGooglePayAvailable(clientToken: String?, localPromise: Promise) {
+    try {
+      if (clientToken.isNullOrEmpty()) {
+        localPromise.resolve(false)
+        return
+      }
+
+      googlePayClientRef = GooglePayClient(
+        context = reactContextRef,
+        authorization = clientToken
+      )
+
+      googlePayClientRef!!.isReadyToPay(reactContextRef) { googlePayReadinessResult ->
+        when (googlePayReadinessResult) {
+          is GooglePayReadinessResult.ReadyToPay -> {
+            localPromise.resolve(true)
+          }
+          is GooglePayReadinessResult.NotReadyToPay -> {
+            localPromise.resolve(false)
+          }
+          else -> {
+            localPromise.resolve(false)
+          }
+        }
+      }
+    } catch (ex: Exception) {
+      localPromise.resolve(false)
+    }
+  }
+
+  @ReactMethod
+  fun requestGooglePayPayment(data: ReadableMap, localPromise: Promise) {
+    try {
+      promiseRef = localPromise
+      currentActivityRef = getCurrentActivity() as FragmentActivity
+      val clientToken = data.getString("clientToken") ?: ""
+
+      // Get launcher from MainActivity bridge
+      val launcherBridge = GooglePayLauncherBridge.getInstance()
+      if (launcherBridge == null) {
+        throw Exception("GooglePayLauncher not initialized. MainActivity setup required.")
+      }
+
+      // Initialize GooglePayClient
+      googlePayClientRef = GooglePayClient(
+        context = currentActivityRef,
+        authorization = clientToken
+      )
+
+      // Check readiness first
+      googlePayClientRef!!.isReadyToPay(currentActivityRef) { googlePayReadinessResult ->
+        when (googlePayReadinessResult) {
+          is GooglePayReadinessResult.ReadyToPay -> {
+            // Create Google Pay request
+            val googlePayRequest: GooglePayRequest = PaypalDataConverter.createGooglePayRequest(data)
+
+            // Create payment auth request
+            googlePayClientRef!!.createPaymentAuthRequest(googlePayRequest) { paymentAuthRequest ->
+              when (paymentAuthRequest) {
+                is GooglePayPaymentAuthRequest.ReadyToLaunch -> {
+                  // Launch Google Pay flow
+                  launcherBridge.launch(currentActivityRef, paymentAuthRequest)
+                }
+                is GooglePayPaymentAuthRequest.Failure -> {
+                  handleGooglePayError(paymentAuthRequest.error)
+                }
+              }
+            }
+          }
+          is GooglePayReadinessResult.NotReadyToPay -> {
+            promiseRef.reject(
+              EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
+              ERROR_TYPES.GOOGLE_PAY_NOT_AVAILABLE.value,
+              PaypalDataConverter.createError(EXCEPTION_TYPES.KOTLIN_EXCEPTION.value, "Google Pay not available")
+            )
+          }
+        }
+      }
+
+    } catch (ex: Exception) {
+      localPromise.reject(
+        EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
+        ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.value,
+        PaypalDataConverter.createError(EXCEPTION_TYPES.KOTLIN_EXCEPTION.value, ex.message)
+      )
+    }
+  }
+
+  public fun handleGooglePayAuthResult(googlePayPaymentAuthResult: GooglePayPaymentAuthResult) {
+    googlePayClientRef?.tokenize(googlePayPaymentAuthResult) { googlePayResult ->
+      when (googlePayResult) {
+        is GooglePayResult.Success -> {
+          paypalRebornModuleHandlers.onGooglePaySuccessHandler(googlePayResult.nonce, promiseRef)
+        }
+        is GooglePayResult.Failure -> {
+          handleGooglePayError(googlePayResult.error)
+        }
+        is GooglePayResult.Cancel -> {
+          if (this::promiseRef.isInitialized) {
+            promiseRef.reject(
+              EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+              ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+              PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled")
+            )
+          }
+        }
+      }
+    }
+  }
+
+  private fun handleGooglePayError(error: Exception) {
+    paypalRebornModuleHandlers.onGooglePayFailure(error, promiseRef)
   }
 
   public fun handlePayPalAccountNonceResult(

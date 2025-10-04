@@ -93,5 +93,6 @@ dependencies {
   implementation 'com.braintreepayments.api:data-collector:5.17.0'
   implementation 'com.braintreepayments.api:paypal:5.17.0'
   implementation 'com.braintreepayments.api:card:5.17.0'
+  implementation 'com.braintreepayments.api:google-pay:5.17.0'
 }
 

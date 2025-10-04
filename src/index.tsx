@@ -10,6 +10,8 @@ import {
   type ApplePayOptions,
   type ApplePayNonceResult,
   type ApplePayCanMakePaymentsOptions,
+  type GooglePayOptions,
+  type GooglePayNonceResult,
 } from './types';
 
 const LINKING_ERROR =
@@ -150,6 +152,41 @@ export async function tokenizeApplePayPayment(options: {
   try {
     const result: ApplePayNonceResult =
       await ExpoBraintree.tokenizeApplePayPayment(options);
+    return result;
+  } catch (ex: unknown) {
+    return ex as BTPayPalError;
+  }
+}
+
+// Google Pay Functions
+export async function isGooglePayAvailable(
+  clientToken: string
+): Promise<boolean> {
+  if (Platform.OS !== 'android') {
+    return false;
+  }
+  try {
+    const result: boolean =
+      await ExpoBraintree.isGooglePayAvailable(clientToken);
+    return result;
+  } catch (ex: unknown) {
+    return false;
+  }
+}
+
+export async function requestGooglePayPayment(
+  options: GooglePayOptions
+): Promise<GooglePayNonceResult | BTPayPalError> {
+  if (Platform.OS !== 'android') {
+    return {
+      code: undefined,
+      message: 'Google Pay is only available on Android',
+      domain: undefined,
+    } as BTPayPalError;
+  }
+  try {
+    const result: GooglePayNonceResult =
+      await ExpoBraintree.requestGooglePayPayment(options);
     return result;
   } catch (ex: unknown) {
     return ex as BTPayPalError;

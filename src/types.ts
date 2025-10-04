@@ -14,6 +14,8 @@ export enum ERROR_TYPES {
   CARD_TOKENIZATION_ERROR = 'CARD_TOKENIZATION_ERROR',
   APPLE_PAY_NOT_AVAILABLE = 'APPLE_PAY_NOT_AVAILABLE',
   APPLE_PAY_TOKENIZATION_ERROR = 'APPLE_PAY_TOKENIZATION_ERROR',
+  GOOGLE_PAY_NOT_AVAILABLE = 'GOOGLE_PAY_NOT_AVAILABLE',
+  GOOGLE_PAY_TOKENIZATION_ERROR = 'GOOGLE_PAY_TOKENIZATION_ERROR',
 }
 
 export enum BTPayPalCheckoutIntent {
@@ -159,4 +161,23 @@ export type ApplePayNonceResult = {
   transactionIdentifier?: string;
   billingContact?: ApplePayContactInfo;
   shippingContact?: ApplePayContactInfo;
+};
+
+// Google Pay Types
+export type GooglePayOptions = {
+  clientToken: string;
+  amount: string;
+  currencyCode?: string;
+  merchantName?: string;
+};
+
+export type GooglePayNonceResult = {
+  nonce: string;
+  type?: string;
+  description?: string;
+  isDefault?: boolean;
+  cardNetwork?: string;
+  email?: string;
+  shippingAddress?: BTPayPalAccountNonceAddressResult;
+  billingAddress?: BTPayPalAccountNonceAddressResult;
 };

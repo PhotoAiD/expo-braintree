@@ -3,6 +3,7 @@ package com.expobraintree
 import com.braintreepayments.api.paypal.PayPalAccountNonce
 import com.braintreepayments.api.core.UserCanceledException
 import com.braintreepayments.api.card.CardNonce
+import com.braintreepayments.api.googlepay.GooglePayNonce
 
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.bridge.Promise
@@ -66,6 +67,35 @@ class PaypalRebornModuleHandlers {
 
   public fun onCardTokenizeSuccessHandler(cardNonce: CardNonce, mPromise: Promise) {
     val result: WritableMap = PaypalDataConverter.createTokenizeCardDataNonce(cardNonce)
+    mPromise.resolve(result)
+  }
+
+  public fun onGooglePayFailure(error: Exception, mPromise: Promise) {
+    if (error is UserCanceledException) {
+      mPromise.reject(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+        ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+        PaypalDataConverter.createError(
+          EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, error.message
+        ))
+      return
+    }
+    error.message?.let {
+      mPromise.reject(EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
+        ERROR_TYPES.GOOGLE_PAY_TOKENIZATION_ERROR.value,
+        PaypalDataConverter.createError(
+          EXCEPTION_TYPES.KOTLIN_EXCEPTION.value, error.message
+        ))
+    } ?: {
+      mPromise.reject(EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
+        ERROR_TYPES.GOOGLE_PAY_TOKENIZATION_ERROR.value,
+        PaypalDataConverter.createError(
+          EXCEPTION_TYPES.KOTLIN_EXCEPTION.value, "Google Pay Error"
+        ))
+    }
+  }
+
+  public fun onGooglePaySuccessHandler(googlePayNonce: GooglePayNonce, mPromise: Promise) {
+    val result: WritableMap = PaypalDataConverter.createGooglePayNonceResult(googlePayNonce)
     mPromise.resolve(result)
   }
 }
