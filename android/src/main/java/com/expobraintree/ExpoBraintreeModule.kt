@@ -333,21 +333,30 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   }
 
   override fun onNewIntent(intent: Intent) {
+    android.util.Log.d("ExpoBraintreeModule", "[DeepLink] onNewIntent called")
+    android.util.Log.d("ExpoBraintreeModule", "[DeepLink] currentActivityRef initialized: ${this::currentActivityRef.isInitialized}")
+    android.util.Log.d("ExpoBraintreeModule", "[DeepLink] pendingPayPalRequest: $pendingPayPalRequest")
+    android.util.Log.d("ExpoBraintreeModule", "[DeepLink] intent.data: ${intent.data}")
+
     if (this::currentActivityRef.isInitialized) {
       // Auto-handle PayPal return if there's a pending request
       if (pendingPayPalRequest != null && intent.data != null) {
         val uri = intent.data.toString()
+        android.util.Log.d("ExpoBraintreeModule", "[DeepLink] Checking URI: $uri")
         // Check if this is a PayPal return (onetouch or braintree scheme)
         if (uri.contains("onetouch") || uri.contains("braintree")) {
+          android.util.Log.d("ExpoBraintreeModule", "[DeepLink] PayPal return detected, handling...")
           // Set intent temporarily for PayPalLauncher to process
           currentActivityRef.setIntent(intent)
           handlePayPalReturn(intent)
           // Clear the intent data to prevent Expo Router from processing it
           currentActivityRef.setIntent(Intent())
+          android.util.Log.d("ExpoBraintreeModule", "[DeepLink] PayPal return handled and intent cleared")
           return
         }
       }
       // For other intents, set normally
+      android.util.Log.d("ExpoBraintreeModule", "[DeepLink] Not a PayPal return, setting intent normally")
       currentActivityRef.setIntent(intent)
     }
   }
