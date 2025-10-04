@@ -334,16 +334,21 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
 
   override fun onNewIntent(intent: Intent) {
     if (this::currentActivityRef.isInitialized) {
-      currentActivityRef.setIntent(intent)
-
       // Auto-handle PayPal return if there's a pending request
       if (pendingPayPalRequest != null && intent.data != null) {
         val uri = intent.data.toString()
         // Check if this is a PayPal return (onetouch or braintree scheme)
         if (uri.contains("onetouch") || uri.contains("braintree")) {
+          // Set intent temporarily for PayPalLauncher to process
+          currentActivityRef.setIntent(intent)
           handlePayPalReturn(intent)
+          // Clear the intent data to prevent Expo Router from processing it
+          currentActivityRef.setIntent(Intent())
+          return
         }
       }
+      // For other intents, set normally
+      currentActivityRef.setIntent(intent)
     }
   }
 
