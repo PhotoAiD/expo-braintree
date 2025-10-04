@@ -383,7 +383,8 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
         pendingPayPalRequest = null
         handlePayPalError(result.error)
       }
-      is PayPalPaymentAuthResult.Cancel -> {
+      is PayPalPaymentAuthResult.NoResult -> {
+        // User canceled or no result - treat as cancellation
         pendingPayPalRequest = null
         if (this::promiseRef.isInitialized) {
           promiseRef.reject(
