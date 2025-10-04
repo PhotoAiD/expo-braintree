@@ -335,6 +335,64 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   override fun onNewIntent(intent: Intent) {
     if (this::currentActivityRef.isInitialized) {
       currentActivityRef.setIntent(intent)
+
+      // Auto-handle PayPal return if there's a pending request
+      if (pendingPayPalRequest != null && intent.data != null) {
+        val uri = intent.data.toString()
+        // Check if this is a PayPal return (onetouch or braintree scheme)
+        if (uri.contains("onetouch") || uri.contains("braintree")) {
+          handlePayPalReturn(intent)
+        }
+      }
+    }
+  }
+
+  private fun handlePayPalReturn(intent: Intent) {
+    val pendingRequestString = pendingPayPalRequest ?: return
+    val launcherBridge = PayPalLauncherBridge.getInstance() ?: return
+
+    val pendingRequest = PayPalPendingRequest.Started(pendingRequestString)
+
+    when (val result = launcherBridge.handleReturnToApp(pendingRequest, intent)) {
+      is PayPalPaymentAuthResult.Success -> {
+        // Tokenize the successful authorization
+        payPalClientRef?.tokenize(result) { tokenizeResult ->
+          when (tokenizeResult) {
+            is PayPalResult.Success -> {
+              pendingPayPalRequest = null
+              handlePayPalAccountNonceResult(tokenizeResult.nonce, null)
+            }
+            is PayPalResult.Failure -> {
+              pendingPayPalRequest = null
+              handlePayPalAccountNonceResult(null, tokenizeResult.error)
+            }
+            is PayPalResult.Cancel -> {
+              pendingPayPalRequest = null
+              if (this::promiseRef.isInitialized) {
+                promiseRef.reject(
+                  EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+                  ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+                  PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled")
+                )
+              }
+            }
+          }
+        }
+      }
+      is PayPalPaymentAuthResult.Failure -> {
+        pendingPayPalRequest = null
+        handlePayPalError(result.error)
+      }
+      is PayPalPaymentAuthResult.Cancel -> {
+        pendingPayPalRequest = null
+        if (this::promiseRef.isInitialized) {
+          promiseRef.reject(
+            EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+            ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+            PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled")
+          )
+        }
+      }
     }
   }
 
