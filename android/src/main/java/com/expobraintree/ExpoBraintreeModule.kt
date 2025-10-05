@@ -458,7 +458,40 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
 
   override fun onHostResume() {
     // V5: Browser switch handling now done via PayPalLauncher and handlePayPalReturnToApp
-    // This method kept empty for backward compatibility
+    // Handle PayPal cancellation: If we have a pending PayPal request when resuming, check if we have a valid intent
+    // If not, the user likely cancelled by pressing X
+    android.util.Log.d("ExpoBraintreeModule", "[Resume] onHostResume called, pendingPayPalRequest: $pendingPayPalRequest")
+
+    if (pendingPayPalRequest != null && this::currentActivityRef.isInitialized) {
+      val currentIntent = currentActivityRef.intent
+      val hasPayPalData = currentIntent?.data?.toString()?.let { uri ->
+        uri.contains("onetouch") || uri.contains("braintree")
+      } ?: false
+
+      if (!hasPayPalData) {
+        // User returned to app without completing PayPal - treat as cancellation
+        android.util.Log.d("ExpoBraintreeModule", "[Resume] No PayPal data found, treating as cancellation")
+
+        // Use a short delay to allow onNewIntent to fire first if it's coming
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+          // Double check pendingPayPalRequest still exists (it might have been cleared by onNewIntent)
+          if (pendingPayPalRequest != null) {
+            android.util.Log.d("ExpoBraintreeModule", "[Resume] Still no PayPal data after delay, rejecting promise")
+            pendingPayPalRequest = null
+            if (this::promiseRef.isInitialized) {
+              promiseRef.reject(
+                EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+                ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+                PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled PayPal payment")
+              )
+            }
+          }
+        }, 500) // 500ms delay to allow onNewIntent to fire if it's coming
+      } else {
+        // Has PayPal data, let onNewIntent handle it
+        android.util.Log.d("ExpoBraintreeModule", "[Resume] Has PayPal data, letting onNewIntent handle it")
+      }
+    }
   }
 
   override fun onNewIntent(intent: Intent) {
@@ -484,6 +517,21 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
           return
         }
       }
+
+      // Handle edge case: pending PayPal request but no intent data - user likely cancelled
+      if (pendingPayPalRequest != null && intent.data == null) {
+        android.util.Log.d("ExpoBraintreeModule", "[DeepLink] Pending PayPal request with no intent data - treating as cancellation")
+        pendingPayPalRequest = null
+        if (this::promiseRef.isInitialized) {
+          promiseRef.reject(
+            EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+            ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+            PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled PayPal payment")
+          )
+        }
+        return
+      }
+
       // For other intents, set normally
       android.util.Log.d("ExpoBraintreeModule", "[DeepLink] Not a PayPal return, setting intent normally")
       currentActivityRef.setIntent(intent)
