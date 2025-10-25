@@ -7,6 +7,11 @@ import {
   type BTPayPalGetDeviceDataResult,
   type BTCardTokenizationNonceResult,
   type TokenizeCardOptions,
+  type ApplePayOptions,
+  type ApplePayNonceResult,
+  type ApplePayCanMakePaymentsOptions,
+  type GooglePayOptions,
+  type GooglePayNonceResult,
 } from './types';
 
 const LINKING_ERROR =
@@ -50,6 +55,18 @@ export async function requestOneTimePayment(
   }
 }
 
+export async function handlePayPalReturnToApp(): Promise<
+  BTPayPalAccountNonceResult | BTPayPalError
+> {
+  try {
+    const result: BTPayPalAccountNonceResult =
+      await ExpoBraintree.handlePayPalReturnToApp();
+    return result;
+  } catch (ex: unknown) {
+    return ex as BTPayPalError;
+  }
+}
+
 export async function getDeviceDataFromDataCollector(
   clientToken: string
 ): Promise<BTPayPalGetDeviceDataResult | BTPayPalError> {
@@ -68,6 +85,108 @@ export async function tokenizeCardData(
   try {
     const result: BTCardTokenizationNonceResult =
       await ExpoBraintree.tokenizeCardData(options);
+    return result;
+  } catch (ex: unknown) {
+    return ex as BTPayPalError;
+  }
+}
+
+// Apple Pay Functions
+export async function isApplePayAvailable(): Promise<boolean> {
+  if (Platform.OS !== 'ios') {
+    return false;
+  }
+  try {
+    const result: boolean = await ExpoBraintree.isApplePayAvailable();
+    return result;
+  } catch (ex: unknown) {
+    return false;
+  }
+}
+
+export async function canMakeApplePayPayments(
+  options?: ApplePayCanMakePaymentsOptions
+): Promise<boolean> {
+  if (Platform.OS !== 'ios') {
+    return false;
+  }
+  try {
+    const result: boolean = await ExpoBraintree.canMakeApplePayPayments(
+      options || {}
+    );
+    return result;
+  } catch (ex: unknown) {
+    return false;
+  }
+}
+
+export async function presentApplePaymentSheet(
+  options: ApplePayOptions
+): Promise<ApplePayNonceResult | BTPayPalError> {
+  if (Platform.OS !== 'ios') {
+    return {
+      code: undefined,
+      message: 'Apple Pay is only available on iOS',
+      domain: undefined,
+    } as BTPayPalError;
+  }
+  try {
+    const result: ApplePayNonceResult =
+      await ExpoBraintree.presentApplePaymentSheet(options);
+    return result;
+  } catch (ex: unknown) {
+    return ex as BTPayPalError;
+  }
+}
+
+export async function tokenizeApplePayPayment(options: {
+  clientToken: string;
+}): Promise<ApplePayNonceResult | BTPayPalError> {
+  if (Platform.OS !== 'ios') {
+    return {
+      code: undefined,
+      message: 'Apple Pay is only available on iOS',
+      domain: undefined,
+    } as BTPayPalError;
+  }
+  try {
+    const result: ApplePayNonceResult =
+      await ExpoBraintree.tokenizeApplePayPayment(options);
+    return result;
+  } catch (ex: unknown) {
+    return ex as BTPayPalError;
+  }
+}
+
+// Google Pay Functions
+export async function isGooglePayAvailable(
+  clientToken: string
+): Promise<boolean> {
+  if (Platform.OS !== 'android') {
+    return false;
+  }
+  try {
+    const result: boolean =
+      await ExpoBraintree.isGooglePayAvailable(clientToken);
+    return result;
+  } catch (ex: unknown) {
+    return false;
+  }
+}
+
+export async function requestGooglePayPayment(
+  options: GooglePayOptions
+): Promise<GooglePayNonceResult | BTPayPalError> {
+  if (Platform.OS !== 'android') {
+    return {
+      code: undefined,
+      message: 'Google Pay is only available on Android',
+      domain: undefined,
+    } as BTPayPalError;
+  }
+  try {
+    const result: GooglePayNonceResult =
+      await ExpoBraintree.requestGooglePayPayment(options);
     return result;
   } catch (ex: unknown) {
     return ex as BTPayPalError;

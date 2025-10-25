@@ -4,17 +4,27 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import androidx.fragment.app.FragmentActivity
-import com.braintreepayments.api.BraintreeClient
-import com.braintreepayments.api.BraintreeRequestCodes
-import com.braintreepayments.api.BrowserSwitchResult
-import com.braintreepayments.api.Card
-import com.braintreepayments.api.CardClient
-import com.braintreepayments.api.CardNonce
-import com.braintreepayments.api.DataCollector
-import com.braintreepayments.api.PayPalAccountNonce
-import com.braintreepayments.api.PayPalCheckoutRequest
-import com.braintreepayments.api.PayPalClient
-import com.braintreepayments.api.PayPalVaultRequest
+import android.net.Uri
+import com.braintreepayments.api.card.Card
+import com.braintreepayments.api.card.CardClient
+import com.braintreepayments.api.card.CardNonce
+import com.braintreepayments.api.datacollector.DataCollector
+import com.braintreepayments.api.datacollector.DataCollectorRequest
+import com.braintreepayments.api.datacollector.DataCollectorResult
+import com.braintreepayments.api.paypal.PayPalAccountNonce
+import com.braintreepayments.api.paypal.PayPalCheckoutRequest
+import com.braintreepayments.api.paypal.PayPalClient
+import com.braintreepayments.api.paypal.PayPalVaultRequest
+import com.braintreepayments.api.paypal.PayPalPendingRequest
+import com.braintreepayments.api.paypal.PayPalPaymentAuthRequest
+import com.braintreepayments.api.paypal.PayPalPaymentAuthResult
+import com.braintreepayments.api.paypal.PayPalResult
+import com.braintreepayments.api.googlepay.GooglePayClient
+import com.braintreepayments.api.googlepay.GooglePayRequest
+import com.braintreepayments.api.googlepay.GooglePayPaymentAuthRequest
+import com.braintreepayments.api.googlepay.GooglePayPaymentAuthResult
+import com.braintreepayments.api.googlepay.GooglePayResult
+import com.braintreepayments.api.googlepay.GooglePayReadinessResult
 import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
@@ -29,8 +39,11 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   private lateinit var promiseRef: Promise
   private lateinit var currentActivityRef: FragmentActivity
   private var reactContextRef: Context
-  private lateinit var braintreeClientRef: BraintreeClient
-  private lateinit var payPalClientRef: PayPalClient
+  private var payPalClientRef: PayPalClient? = null
+  private var cardClientRef: CardClient? = null
+  private var dataCollectorRef: DataCollector? = null
+  private var googlePayClientRef: GooglePayClient? = null
+  private var pendingPayPalRequest: String? = null
   private val paypalRebornModuleHandlers: PaypalRebornModuleHandlers = PaypalRebornModuleHandlers()
 
   init {
@@ -44,17 +57,49 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     try {
       promiseRef = localPromise
       currentActivityRef = getCurrentActivity() as FragmentActivity
-      braintreeClientRef = BraintreeClient(currentActivityRef, data.getString("clientToken") ?: "")
+      val clientToken = data.getString("clientToken") ?: ""
 
-      if (this::currentActivityRef.isInitialized && this::braintreeClientRef.isInitialized) {
-        payPalClientRef = PayPalClient(braintreeClientRef)
-        val vaultRequest: PayPalVaultRequest = PaypalDataConverter.createVaultRequest(data)
-        payPalClientRef.tokenizePayPalAccount(currentActivityRef, vaultRequest) { e: Exception? ->
-          handlePayPalAccountNonceResult(null, e)
-        }
-      } else {
-        throw Exception()
+      // Get launcher from MainActivity bridge
+      val launcherBridge = PayPalLauncherBridge.getInstance()
+      if (launcherBridge == null) {
+        throw Exception("PayPalLauncher not initialized. MainActivity setup required.")
       }
+
+      // Initialize PayPalClient with app link and deep link
+      val appLinkUri = Uri.parse("https://photoaid.com")
+      val deepLinkScheme = "${currentActivityRef.packageName}.braintree"
+
+      payPalClientRef = PayPalClient(
+        context = currentActivityRef,
+        authorization = clientToken,
+        appLinkReturnUrl = appLinkUri,
+        deepLinkFallbackUrlScheme = deepLinkScheme
+      )
+
+      val vaultRequest: PayPalVaultRequest = PaypalDataConverter.createVaultRequest(data)
+
+      // Step 1: Create payment auth request
+      payPalClientRef!!.createPaymentAuthRequest(currentActivityRef, vaultRequest) { paymentAuthRequest ->
+        when (paymentAuthRequest) {
+          is PayPalPaymentAuthRequest.ReadyToLaunch -> {
+            // Step 2: Launch PayPal flow
+            val pendingRequest = launcherBridge.launch(currentActivityRef, paymentAuthRequest)
+            when (pendingRequest) {
+              is PayPalPendingRequest.Started -> {
+                // Store pending request for later completion
+                pendingPayPalRequest = pendingRequest.pendingRequestString
+              }
+              is PayPalPendingRequest.Failure -> {
+                handlePayPalError(pendingRequest.error)
+              }
+            }
+          }
+          is PayPalPaymentAuthRequest.Failure -> {
+            handlePayPalError(paymentAuthRequest.error)
+          }
+        }
+      }
+
     } catch (ex: Exception) {
       localPromise.reject(
           EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
@@ -68,18 +113,35 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   fun getDeviceDataFromDataCollector(clientToken: String?, localPromise: Promise) {
     try {
       promiseRef = localPromise
-      braintreeClientRef = BraintreeClient(reactContextRef, clientToken ?: "")
-      if (this::braintreeClientRef.isInitialized) {
-        val dataCollectorClient = DataCollector(braintreeClientRef)
-        dataCollectorClient.collectDeviceData(reactContextRef) { result: String?, e: Exception? ->
-          paypalRebornModuleHandlers.handleGetDeviceDataFromDataCollectorResult(
-              result,
-              e,
+
+      // V5: Direct initialization without BraintreeClient
+      dataCollectorRef = DataCollector(
+        context = reactContextRef,
+        authorization = clientToken ?: ""
+      )
+
+      // V5: collectDeviceData with DataCollectorRequest and sealed class result
+      val dataCollectorRequest = DataCollectorRequest(hasUserLocationConsent = false)
+      dataCollectorRef!!.collectDeviceData(
+        context = reactContextRef,
+        request = dataCollectorRequest
+      ) { dataCollectorResult ->
+        when (dataCollectorResult) {
+          is DataCollectorResult.Success -> {
+            paypalRebornModuleHandlers.handleGetDeviceDataFromDataCollectorResult(
+              dataCollectorResult.deviceData,
+              null,
               promiseRef
-          )
+            )
+          }
+          is DataCollectorResult.Failure -> {
+            paypalRebornModuleHandlers.handleGetDeviceDataFromDataCollectorResult(
+              null,
+              dataCollectorResult.error,
+              promiseRef
+            )
+          }
         }
-      } else {
-        throw Exception("Not Initialized")
       }
     } catch (ex: Exception) {
       promiseRef.reject(
@@ -95,18 +157,49 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     try {
       promiseRef = localPromise
       currentActivityRef = getCurrentActivity() as FragmentActivity
-      braintreeClientRef = BraintreeClient(currentActivityRef, data.getString("clientToken") ?: "")
+      val clientToken = data.getString("clientToken") ?: ""
 
-      if (this::currentActivityRef.isInitialized && this::braintreeClientRef.isInitialized) {
-        payPalClientRef = PayPalClient(braintreeClientRef)
-        val checkoutRequest: PayPalCheckoutRequest = PaypalDataConverter.createCheckoutRequest(data)
-        payPalClientRef.tokenizePayPalAccount(currentActivityRef, checkoutRequest) { e: Exception?
-          ->
-          handlePayPalAccountNonceResult(null, e)
-        }
-      } else {
-        throw Exception()
+      // Get launcher from MainActivity bridge
+      val launcherBridge = PayPalLauncherBridge.getInstance()
+      if (launcherBridge == null) {
+        throw Exception("PayPalLauncher not initialized. MainActivity setup required.")
       }
+
+      // Initialize PayPalClient with app link and deep link
+      val appLinkUri = Uri.parse("https://photoaid.com")
+      val deepLinkScheme = "${currentActivityRef.packageName}.braintree"
+
+      payPalClientRef = PayPalClient(
+        context = currentActivityRef,
+        authorization = clientToken,
+        appLinkReturnUrl = appLinkUri,
+        deepLinkFallbackUrlScheme = deepLinkScheme
+      )
+
+      val checkoutRequest: PayPalCheckoutRequest = PaypalDataConverter.createCheckoutRequest(data)
+
+      // Step 1: Create payment auth request
+      payPalClientRef!!.createPaymentAuthRequest(currentActivityRef, checkoutRequest) { paymentAuthRequest ->
+        when (paymentAuthRequest) {
+          is PayPalPaymentAuthRequest.ReadyToLaunch -> {
+            // Step 2: Launch PayPal flow
+            val pendingRequest = launcherBridge.launch(currentActivityRef, paymentAuthRequest)
+            when (pendingRequest) {
+              is PayPalPendingRequest.Started -> {
+                // Store pending request for later completion
+                pendingPayPalRequest = pendingRequest.pendingRequestString
+              }
+              is PayPalPendingRequest.Failure -> {
+                handlePayPalError(pendingRequest.error)
+              }
+            }
+          }
+          is PayPalPaymentAuthRequest.Failure -> {
+            handlePayPalError(paymentAuthRequest.error)
+          }
+        }
+      }
+
     } catch (ex: Exception) {
       localPromise.reject(
           EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
@@ -121,16 +214,25 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     try {
       promiseRef = localPromise
       currentActivityRef = getCurrentActivity() as FragmentActivity
-      braintreeClientRef = BraintreeClient(currentActivityRef, data.getString("clientToken") ?: "")
+      val clientToken = data.getString("clientToken") ?: ""
 
-      if (this::currentActivityRef.isInitialized && this::braintreeClientRef.isInitialized) {
-        val cardClient = CardClient(braintreeClientRef)
-        val cardRequest: Card = PaypalDataConverter.createTokenizeCardRequest(data)
-        cardClient.tokenize(cardRequest) { cardNonce, error ->
-          handleCardTokenizeResult(cardNonce, error)
+      // V5: Direct initialization without BraintreeClient
+      cardClientRef = CardClient(
+        context = currentActivityRef,
+        authorization = clientToken
+      )
+
+      val cardRequest: Card = PaypalDataConverter.createTokenizeCardRequest(data)
+      // V5: CardResult sealed class instead of two parameters
+      cardClientRef!!.tokenize(cardRequest) { cardResult ->
+        when (cardResult) {
+          is com.braintreepayments.api.card.CardResult.Success -> {
+            handleCardTokenizeResult(cardResult.nonce, null)
+          }
+          is com.braintreepayments.api.card.CardResult.Failure -> {
+            handleCardTokenizeResult(null, cardResult.error)
+          }
         }
-      } else {
-        throw Exception()
       }
     } catch (ex: Exception) {
       localPromise.reject(
@@ -154,6 +256,128 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     }
   }
 
+  @ReactMethod
+  fun isGooglePayAvailable(clientToken: String?, localPromise: Promise) {
+    try {
+      if (clientToken.isNullOrEmpty()) {
+        localPromise.resolve(false)
+        return
+      }
+
+      googlePayClientRef = GooglePayClient(
+        context = reactContextRef,
+        authorization = clientToken
+      )
+
+      googlePayClientRef!!.isReadyToPay(reactContextRef) { googlePayReadinessResult ->
+        when (googlePayReadinessResult) {
+          is GooglePayReadinessResult.ReadyToPay -> {
+            localPromise.resolve(true)
+          }
+          is GooglePayReadinessResult.NotReadyToPay -> {
+            localPromise.resolve(false)
+          }
+          else -> {
+            localPromise.resolve(false)
+          }
+        }
+      }
+    } catch (ex: Exception) {
+      localPromise.resolve(false)
+    }
+  }
+
+  @ReactMethod
+  fun requestGooglePayPayment(data: ReadableMap, localPromise: Promise) {
+    try {
+      promiseRef = localPromise
+      currentActivityRef = getCurrentActivity() as FragmentActivity
+      val clientToken = data.getString("clientToken") ?: ""
+
+      // Get launcher from MainActivity bridge
+      val launcherBridge = GooglePayLauncherBridge.getInstance()
+      if (launcherBridge == null) {
+        throw Exception("GooglePayLauncher not initialized. MainActivity setup required.")
+      }
+
+      // Initialize GooglePayClient
+      googlePayClientRef = GooglePayClient(
+        context = currentActivityRef,
+        authorization = clientToken
+      )
+
+      // Check readiness first
+      googlePayClientRef!!.isReadyToPay(currentActivityRef) { googlePayReadinessResult ->
+        when (googlePayReadinessResult) {
+          is GooglePayReadinessResult.ReadyToPay -> {
+            // Create Google Pay request
+            val googlePayRequest: GooglePayRequest = PaypalDataConverter.createGooglePayRequest(data)
+
+            // Create payment auth request
+            googlePayClientRef!!.createPaymentAuthRequest(googlePayRequest) { paymentAuthRequest ->
+              when (paymentAuthRequest) {
+                is GooglePayPaymentAuthRequest.ReadyToLaunch -> {
+                  // Launch Google Pay flow
+                  launcherBridge.launch(paymentAuthRequest)
+                }
+                is GooglePayPaymentAuthRequest.Failure -> {
+                  handleGooglePayError(paymentAuthRequest.error)
+                }
+              }
+            }
+          }
+          is GooglePayReadinessResult.NotReadyToPay -> {
+            promiseRef.reject(
+              EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
+              ERROR_TYPES.GOOGLE_PAY_NOT_AVAILABLE.value,
+              PaypalDataConverter.createError(EXCEPTION_TYPES.KOTLIN_EXCEPTION.value, "Google Pay not available")
+            )
+          }
+          null -> {
+            promiseRef.reject(
+              EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
+              ERROR_TYPES.GOOGLE_PAY_NOT_AVAILABLE.value,
+              PaypalDataConverter.createError(EXCEPTION_TYPES.KOTLIN_EXCEPTION.value, "Google Pay readiness check failed")
+            )
+          }
+        }
+      }
+
+    } catch (ex: Exception) {
+      localPromise.reject(
+        EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
+        ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.value,
+        PaypalDataConverter.createError(EXCEPTION_TYPES.KOTLIN_EXCEPTION.value, ex.message)
+      )
+    }
+  }
+
+  public fun handleGooglePayAuthResult(googlePayPaymentAuthResult: GooglePayPaymentAuthResult) {
+    googlePayClientRef?.tokenize(googlePayPaymentAuthResult) { googlePayResult ->
+      when (googlePayResult) {
+        is GooglePayResult.Success -> {
+          paypalRebornModuleHandlers.onGooglePaySuccessHandler(googlePayResult.nonce, promiseRef)
+        }
+        is GooglePayResult.Failure -> {
+          handleGooglePayError(googlePayResult.error)
+        }
+        is GooglePayResult.Cancel -> {
+          if (this::promiseRef.isInitialized) {
+            promiseRef.reject(
+              EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+              ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+              PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled")
+            )
+          }
+        }
+      }
+    }
+  }
+
+  private fun handleGooglePayError(error: Exception) {
+    paypalRebornModuleHandlers.onGooglePayFailure(error, promiseRef)
+  }
+
   public fun handlePayPalAccountNonceResult(
       payPalAccountNonce: PayPalAccountNonce?,
       error: Exception?,
@@ -167,27 +391,200 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     }
   }
 
-  override fun onHostResume() {
-    if (this::braintreeClientRef.isInitialized && this::currentActivityRef.isInitialized) {
-      val browserSwitchResult: BrowserSwitchResult? =
-          braintreeClientRef.deliverBrowserSwitchResult(currentActivityRef)
-      if (browserSwitchResult != null) {
-        when (browserSwitchResult.requestCode) {
-          BraintreeRequestCodes.PAYPAL ->
-              if (this::payPalClientRef.isInitialized) {
-                payPalClientRef.onBrowserSwitchResult(
-                    browserSwitchResult,
-                    this::handlePayPalAccountNonceResult
+  @ReactMethod
+  fun handlePayPalReturnToApp(localPromise: Promise) {
+    try {
+      val pendingRequestString = pendingPayPalRequest
+      if (pendingRequestString == null) {
+        localPromise.reject("NO_PENDING_REQUEST", "No pending PayPal request found")
+        return
+      }
+
+      val launcherBridge = PayPalLauncherBridge.getInstance()
+      if (launcherBridge == null) {
+        throw Exception("PayPalLauncher not available")
+      }
+
+      val intent = currentActivityRef.intent
+      val pendingRequest = PayPalPendingRequest.Started(pendingRequestString)
+
+      when (val result = launcherBridge.handleReturnToApp(pendingRequest, intent)) {
+        is PayPalPaymentAuthResult.Success -> {
+          // Step 3: Tokenize the successful authorization
+          // V5: Pass PayPalPaymentAuthResult.Success directly, not individual parameters
+          payPalClientRef?.tokenize(result) { tokenizeResult ->
+            when (tokenizeResult) {
+              is PayPalResult.Success -> {
+                pendingPayPalRequest = null
+                handlePayPalAccountNonceResult(tokenizeResult.nonce, null)
+              }
+              is PayPalResult.Failure -> {
+                pendingPayPalRequest = null
+                handlePayPalAccountNonceResult(null, tokenizeResult.error)
+              }
+              is PayPalResult.Cancel -> {
+                pendingPayPalRequest = null
+                localPromise.reject(
+                  EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+                  ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+                  PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled")
                 )
               }
+            }
+          }
         }
+        is PayPalPaymentAuthResult.NoResult -> {
+          // User returned to app without completing - keep pending request
+          localPromise.reject("NO_RESULT", "User returned without completing PayPal flow")
+        }
+        is PayPalPaymentAuthResult.Failure -> {
+          pendingPayPalRequest = null
+          handlePayPalError(result.error)
+        }
+      }
+
+    } catch (ex: Exception) {
+      localPromise.reject(
+        EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
+        "HANDLE_RETURN_ERROR",
+        PaypalDataConverter.createError(EXCEPTION_TYPES.KOTLIN_EXCEPTION.value, ex.message)
+      )
+    }
+  }
+
+  private fun handlePayPalError(error: Exception) {
+    paypalRebornModuleHandlers.onPayPalFailure(error, promiseRef)
+  }
+
+  override fun onHostResume() {
+    // V5: Browser switch handling now done via PayPalLauncher and handlePayPalReturnToApp
+    // Handle PayPal cancellation: If we have a pending PayPal request when resuming, check if we have a valid intent
+    // If not, the user likely cancelled by pressing X
+    android.util.Log.d("ExpoBraintreeModule", "[Resume] onHostResume called, pendingPayPalRequest: $pendingPayPalRequest")
+
+    if (pendingPayPalRequest != null && this::currentActivityRef.isInitialized) {
+      val currentIntent = currentActivityRef.intent
+      val hasPayPalData = currentIntent?.data?.toString()?.let { uri ->
+        uri.contains("onetouch") || uri.contains("braintree")
+      } ?: false
+
+      if (!hasPayPalData) {
+        // User returned to app without completing PayPal - treat as cancellation
+        android.util.Log.d("ExpoBraintreeModule", "[Resume] No PayPal data found, treating as cancellation")
+
+        // Use a short delay to allow onNewIntent to fire first if it's coming
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+          // Double check pendingPayPalRequest still exists (it might have been cleared by onNewIntent)
+          if (pendingPayPalRequest != null) {
+            android.util.Log.d("ExpoBraintreeModule", "[Resume] Still no PayPal data after delay, rejecting promise")
+            pendingPayPalRequest = null
+            if (this::promiseRef.isInitialized) {
+              promiseRef.reject(
+                EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+                ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+                PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled PayPal payment")
+              )
+            }
+          }
+        }, 500) // 500ms delay to allow onNewIntent to fire if it's coming
+      } else {
+        // Has PayPal data, let onNewIntent handle it
+        android.util.Log.d("ExpoBraintreeModule", "[Resume] Has PayPal data, letting onNewIntent handle it")
       }
     }
   }
 
-  override fun onNewIntent(intent: Intent?) {
+  override fun onNewIntent(intent: Intent) {
+    android.util.Log.d("ExpoBraintreeModule", "[DeepLink] onNewIntent called")
+    android.util.Log.d("ExpoBraintreeModule", "[DeepLink] currentActivityRef initialized: ${this::currentActivityRef.isInitialized}")
+    android.util.Log.d("ExpoBraintreeModule", "[DeepLink] pendingPayPalRequest: $pendingPayPalRequest")
+    android.util.Log.d("ExpoBraintreeModule", "[DeepLink] intent.data: ${intent.data}")
+
     if (this::currentActivityRef.isInitialized) {
+      // Auto-handle PayPal return if there's a pending request
+      if (pendingPayPalRequest != null && intent.data != null) {
+        val uri = intent.data.toString()
+        android.util.Log.d("ExpoBraintreeModule", "[DeepLink] Checking URI: $uri")
+        // Check if this is a PayPal return (onetouch or braintree scheme)
+        if (uri.contains("onetouch") || uri.contains("braintree")) {
+          android.util.Log.d("ExpoBraintreeModule", "[DeepLink] PayPal return detected, handling...")
+          // Set intent temporarily for PayPalLauncher to process
+          currentActivityRef.setIntent(intent)
+          handlePayPalReturn(intent)
+          // Clear the intent data to prevent Expo Router from processing it
+          currentActivityRef.setIntent(Intent())
+          android.util.Log.d("ExpoBraintreeModule", "[DeepLink] PayPal return handled and intent cleared")
+          return
+        }
+      }
+
+      // Handle edge case: pending PayPal request but no intent data - user likely cancelled
+      if (pendingPayPalRequest != null && intent.data == null) {
+        android.util.Log.d("ExpoBraintreeModule", "[DeepLink] Pending PayPal request with no intent data - treating as cancellation")
+        pendingPayPalRequest = null
+        if (this::promiseRef.isInitialized) {
+          promiseRef.reject(
+            EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+            ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+            PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled PayPal payment")
+          )
+        }
+        return
+      }
+
+      // For other intents, set normally
+      android.util.Log.d("ExpoBraintreeModule", "[DeepLink] Not a PayPal return, setting intent normally")
       currentActivityRef.setIntent(intent)
+    }
+  }
+
+  private fun handlePayPalReturn(intent: Intent) {
+    val pendingRequestString = pendingPayPalRequest ?: return
+    val launcherBridge = PayPalLauncherBridge.getInstance() ?: return
+
+    val pendingRequest = PayPalPendingRequest.Started(pendingRequestString)
+
+    when (val result = launcherBridge.handleReturnToApp(pendingRequest, intent)) {
+      is PayPalPaymentAuthResult.Success -> {
+        // Tokenize the successful authorization
+        payPalClientRef?.tokenize(result) { tokenizeResult ->
+          when (tokenizeResult) {
+            is PayPalResult.Success -> {
+              pendingPayPalRequest = null
+              handlePayPalAccountNonceResult(tokenizeResult.nonce, null)
+            }
+            is PayPalResult.Failure -> {
+              pendingPayPalRequest = null
+              handlePayPalAccountNonceResult(null, tokenizeResult.error)
+            }
+            is PayPalResult.Cancel -> {
+              pendingPayPalRequest = null
+              if (this::promiseRef.isInitialized) {
+                promiseRef.reject(
+                  EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+                  ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+                  PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled")
+                )
+              }
+            }
+          }
+        }
+      }
+      is PayPalPaymentAuthResult.Failure -> {
+        pendingPayPalRequest = null
+        handlePayPalError(result.error)
+      }
+      is PayPalPaymentAuthResult.NoResult -> {
+        // User canceled or no result - treat as cancellation
+        pendingPayPalRequest = null
+        if (this::promiseRef.isInitialized) {
+          promiseRef.reject(
+            EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+            ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+            PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled")
+          )
+        }
+      }
     }
   }
 
@@ -195,13 +592,17 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     return NAME
   }
 
+  override fun getConstants(): Map<String, Any>? {
+    return emptyMap()
+  }
+
   // empty required Implementations from interfaces
   override fun onHostPause() {}
   override fun onHostDestroy() {}
   override fun onActivityResult(
-      activity: Activity?,
+      activity: Activity,
       requestCode: Int,
       resultCode: Int,
-      intent: Intent?
+      data: Intent?
   ) {}
 }
