@@ -4,44 +4,15 @@ import Foundation
 func prepareThreeDSecureRequest(options: [String: Any]) -> BTThreeDSecureRequest {
   let threeDSecureRequest = BTThreeDSecureRequest()
 
+  let formatter = NumberFormatter()
+  formatter.generatesDecimalNumbers = true
+
   if let amountString = options["amount"] as? String {
-    let formatter = NumberFormatter()
-    formatter.generatesDecimalNumbers = true
     threeDSecureRequest.amount = formatter.number(from: amountString) as? NSDecimalNumber ?? 0
   }
 
   threeDSecureRequest.nonce = options["nonce"] as? String
   threeDSecureRequest.email = options["email"] as? String
-
-  if let versionRequested = options["versionRequested"] as? String {
-    if versionRequested == "2" {
-      threeDSecureRequest.versionRequested = .version2
-    } else {
-      threeDSecureRequest.versionRequested = .version1
-    }
-  } else {
-    threeDSecureRequest.versionRequested = .version2
-  }
-
-  if let accountType = options["accountType"] as? String {
-    threeDSecureRequest.accountType = accountType
-  }
-
-  if let challengeRequested = options["challengeRequested"] as? Bool {
-    threeDSecureRequest.challengeRequested = challengeRequested
-  }
-
-  if let exemptionRequested = options["exemptionRequested"] as? Bool {
-    threeDSecureRequest.exemptionRequested = exemptionRequested
-  }
-
-  if let mobilePhoneNumber = options["mobilePhoneNumber"] as? String {
-    threeDSecureRequest.mobilePhoneNumber = mobilePhoneNumber
-  }
-
-  if let cardAddChallenge = options["cardAddChallenge"] as? String {
-    threeDSecureRequest.cardAddChallenge = cardAddChallenge
-  }
 
   if let billingAddressDict = options["billingAddress"] as? [String: String] {
     let billingAddress = BTThreeDSecurePostalAddress()
@@ -59,10 +30,6 @@ func prepareThreeDSecureRequest(options: [String: Any]) -> BTThreeDSecureRequest
 
   if let additionalInfoDict = options["additionalInformation"] as? [String: Any] {
     let additionalInfo = BTThreeDSecureAdditionalInformation()
-
-    additionalInfo.shippingGivenName = additionalInfoDict["shippingGivenName"] as? String
-    additionalInfo.shippingSurname = additionalInfoDict["shippingSurname"] as? String
-    additionalInfo.shippingPhone = additionalInfoDict["shippingPhone"] as? String
 
     if let shippingAddressDict = additionalInfoDict["shippingAddress"] as? [String: String] {
       let shippingAddress = BTThreeDSecurePostalAddress()
@@ -95,7 +62,6 @@ func prepareThreeDSecureNonceResult(nonce: BTThreeDSecureResult) -> NSDictionary
     result["expirationMonth"] = tokenizedCard.expirationMonth
     result["expirationYear"] = tokenizedCard.expirationYear
     result["bin"] = tokenizedCard.bin
-    result["cardType"] = tokenizedCard.cardType
 
     let threeDSecureInfo = NSMutableDictionary()
     threeDSecureInfo["liabilityShifted"] = tokenizedCard.threeDSecureInfo.liabilityShifted
