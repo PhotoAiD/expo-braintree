@@ -16,6 +16,10 @@ export enum ERROR_TYPES {
   APPLE_PAY_TOKENIZATION_ERROR = 'APPLE_PAY_TOKENIZATION_ERROR',
   GOOGLE_PAY_NOT_AVAILABLE = 'GOOGLE_PAY_NOT_AVAILABLE',
   GOOGLE_PAY_TOKENIZATION_ERROR = 'GOOGLE_PAY_TOKENIZATION_ERROR',
+  THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY = 'THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY',
+  THREE_D_SECURE_LIABILITY_NOT_SHIFTED = 'THREE_D_SECURE_LIABILITY_NOT_SHIFTED',
+  THREE_D_SECURE_VERIFICATION_FAILED = 'THREE_D_SECURE_VERIFICATION_FAILED',
+  THREE_D_SECURE_AUTHENTICATION_FAILED = 'THREE_D_SECURE_AUTHENTICATION_FAILED',
 }
 
 export enum BTPayPalCheckoutIntent {
@@ -180,4 +184,57 @@ export type GooglePayNonceResult = {
   email?: string;
   shippingAddress?: BTPayPalAccountNonceAddressResult;
   billingAddress?: BTPayPalAccountNonceAddressResult;
+};
+
+// 3D Secure Types
+export type ThreeDSecurePostalAddress = {
+  givenName?: string;
+  surname?: string;
+  phoneNumber?: string;
+  streetAddress?: string;
+  extendedAddress?: string;
+  locality?: string;
+  region?: string;
+  postalCode?: string;
+  countryCodeAlpha2?: string;
+};
+
+export type ThreeDSecureAdditionalInformation = {
+  shippingGivenName?: string;
+  shippingSurname?: string;
+  shippingPhone?: string;
+  shippingAddress?: ThreeDSecurePostalAddress;
+};
+
+export type ThreeDSecureRequestOptions = {
+  clientToken: string;
+  amount: string;
+  nonce: string;
+  email?: string;
+  billingAddress?: ThreeDSecurePostalAddress;
+  additionalInformation?: ThreeDSecureAdditionalInformation;
+  versionRequested?: '1' | '2';
+  accountType?: 'credit' | 'debit';
+  challengeRequested?: boolean;
+  exemptionRequested?: boolean;
+  mobilePhoneNumber?: string;
+  cardAddChallenge?: 'requested' | 'not_requested';
+};
+
+export type ThreeDSecureInfo = {
+  liabilityShifted: boolean;
+  liabilityShiftPossible: boolean;
+  wasVerified: boolean;
+};
+
+export type ThreeDSecureNonceResult = {
+  nonce: string;
+  threeDSecureInfo: ThreeDSecureInfo;
+  cardNetwork?: string;
+  lastTwo?: string;
+  lastFour?: string;
+  expirationMonth?: string;
+  expirationYear?: string;
+  bin?: string;
+  cardType?: string;
 };

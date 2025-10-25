@@ -25,6 +25,11 @@ import com.braintreepayments.api.googlepay.GooglePayPaymentAuthRequest
 import com.braintreepayments.api.googlepay.GooglePayPaymentAuthResult
 import com.braintreepayments.api.googlepay.GooglePayResult
 import com.braintreepayments.api.googlepay.GooglePayReadinessResult
+import com.braintreepayments.api.threeDSecure.ThreeDSecureClient
+import com.braintreepayments.api.threeDSecure.ThreeDSecureRequest
+import com.braintreepayments.api.threeDSecure.ThreeDSecurePaymentAuthRequest
+import com.braintreepayments.api.threeDSecure.ThreeDSecurePaymentAuthResult
+import com.braintreepayments.api.threeDSecure.ThreeDSecureResult
 import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
@@ -43,6 +48,7 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   private var cardClientRef: CardClient? = null
   private var dataCollectorRef: DataCollector? = null
   private var googlePayClientRef: GooglePayClient? = null
+  private var threeDSecureClientRef: ThreeDSecureClient? = null
   private var pendingPayPalRequest: String? = null
   private val paypalRebornModuleHandlers: PaypalRebornModuleHandlers = PaypalRebornModuleHandlers()
 
@@ -454,6 +460,107 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
 
   private fun handlePayPalError(error: Exception) {
     paypalRebornModuleHandlers.onPayPalFailure(error, promiseRef)
+  }
+
+  @ReactMethod
+  fun verifyThreeDSecure(data: ReadableMap, localPromise: Promise) {
+    try {
+      promiseRef = localPromise
+      currentActivityRef = getCurrentActivity() as FragmentActivity
+      val clientToken = data.getString("clientToken") ?: ""
+
+      val launcherBridge = ThreeDSecureLauncherBridge.getInstance()
+      if (launcherBridge == null) {
+        throw Exception("ThreeDSecureLauncher not initialized. MainActivity setup required.")
+      }
+
+      threeDSecureClientRef = ThreeDSecureClient(
+        context = currentActivityRef,
+        authorization = clientToken
+      )
+
+      val threeDSecureRequest: ThreeDSecureRequest = ThreeDSecureDataConverter.createThreeDSecureRequest(data)
+
+      threeDSecureClientRef!!.createPaymentAuthRequest(currentActivityRef, threeDSecureRequest) { paymentAuthRequest ->
+        when (paymentAuthRequest) {
+          is ThreeDSecurePaymentAuthRequest.ReadyToLaunch -> {
+            launcherBridge.launch(paymentAuthRequest)
+          }
+          is ThreeDSecurePaymentAuthRequest.Failure -> {
+            handleThreeDSecureError(paymentAuthRequest.error)
+          }
+        }
+      }
+
+    } catch (ex: Exception) {
+      localPromise.reject(
+        EXCEPTION_TYPES.KOTLIN_EXCEPTION.value,
+        ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.value,
+        PaypalDataConverter.createError(EXCEPTION_TYPES.KOTLIN_EXCEPTION.value, ex.message)
+      )
+    }
+  }
+
+  public fun handleThreeDSecureAuthResult(threeDSecurePaymentAuthResult: ThreeDSecurePaymentAuthResult) {
+    threeDSecureClientRef?.tokenize(threeDSecurePaymentAuthResult) { threeDSecureResult ->
+      when (threeDSecureResult) {
+        is ThreeDSecureResult.Success -> {
+          val cardNonce = threeDSecureResult.nonce
+          val threeDSecureInfo = cardNonce.threeDSecureInfo
+
+          if (threeDSecureInfo != null) {
+            if (!threeDSecureInfo.isLiabilityShiftPossible) {
+              promiseRef.reject(
+                EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
+                ERROR_TYPES.THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY.value,
+                PaypalDataConverter.createError(
+                  EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
+                  "3D Secure liability shift not possible"
+                )
+              )
+              return@tokenize
+            }
+
+            if (!threeDSecureInfo.isLiabilityShifted) {
+              promiseRef.reject(
+                EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
+                ERROR_TYPES.THREE_D_SECURE_LIABILITY_NOT_SHIFTED.value,
+                PaypalDataConverter.createError(
+                  EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
+                  "3D Secure liability not shifted"
+                )
+              )
+              return@tokenize
+            }
+          }
+
+          val result = ThreeDSecureDataConverter.createThreeDSecureNonceResult(cardNonce)
+          promiseRef.resolve(result)
+        }
+        is ThreeDSecureResult.Failure -> {
+          handleThreeDSecureError(threeDSecureResult.error)
+        }
+        is ThreeDSecureResult.Cancel -> {
+          if (this::promiseRef.isInitialized) {
+            promiseRef.reject(
+              EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+              ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+              PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "User cancelled")
+            )
+          }
+        }
+      }
+    }
+  }
+
+  private fun handleThreeDSecureError(error: Exception) {
+    if (this::promiseRef.isInitialized) {
+      promiseRef.reject(
+        EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
+        ERROR_TYPES.THREE_D_SECURE_AUTHENTICATION_FAILED.value,
+        PaypalDataConverter.createError(EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value, error.message)
+      )
+    }
   }
 
   override fun onHostResume() {

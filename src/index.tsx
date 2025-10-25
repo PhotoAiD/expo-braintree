@@ -12,6 +12,8 @@ import {
   type ApplePayCanMakePaymentsOptions,
   type GooglePayOptions,
   type GooglePayNonceResult,
+  type ThreeDSecureRequestOptions,
+  type ThreeDSecureNonceResult,
 } from './types';
 
 const LINKING_ERROR =
@@ -187,6 +189,18 @@ export async function requestGooglePayPayment(
   try {
     const result: GooglePayNonceResult =
       await ExpoBraintree.requestGooglePayPayment(options);
+    return result;
+  } catch (ex: unknown) {
+    return ex as BTPayPalError;
+  }
+}
+
+export async function verifyThreeDSecure(
+  options: ThreeDSecureRequestOptions
+): Promise<ThreeDSecureNonceResult | BTPayPalError> {
+  try {
+    const result: ThreeDSecureNonceResult =
+      await ExpoBraintree.verifyThreeDSecure(options);
     return result;
   } catch (ex: unknown) {
     return ex as BTPayPalError;

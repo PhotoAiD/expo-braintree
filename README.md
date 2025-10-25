@@ -72,6 +72,41 @@ Also, add this intent-filter to your main activity in `AndroidManifest.xml`
 
 ```
 
+##### MainActivity Setup for PayPal, Google Pay, and 3D Secure
+
+To enable PayPal, Google Pay, and 3D Secure verification, you need to initialize the launchers in your MainActivity. See the example MainActivity in the repository for reference.
+
+```kotlin
+import com.expobraintree.PayPalLauncherBridge
+import com.expobraintree.GooglePayLauncherBridge
+import com.expobraintree.ThreeDSecureLauncherBridge
+import com.braintreepayments.api.paypal.PayPalLauncher
+import com.braintreepayments.api.googlepay.GooglePayLauncher
+import com.braintreepayments.api.threeDSecure.ThreeDSecureLauncher
+
+class MainActivity : ReactActivity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+
+    // Initialize launchers
+    val paypalLauncher = PayPalLauncher(this) { result ->
+      // Handle result
+    }
+    PayPalLauncherBridge.initialize(paypalLauncher)
+
+    val googlePayLauncher = GooglePayLauncher(this) { result ->
+      // Handle result
+    }
+    GooglePayLauncherBridge.initialize(googlePayLauncher)
+
+    val threeDSecureLauncher = ThreeDSecureLauncher(this) { result ->
+      // Handle result
+    }
+    ThreeDSecureLauncherBridge.initialize(threeDSecureLauncher)
+  }
+}
+```
+
 #### iOS Specific
 ```bash
 cd ios
@@ -211,7 +246,33 @@ const result: string = await getDeviceDataFromDataCollector("Token")
 
 ```
 
+##### 3D Secure Verification
+```javascript
+import {
+  verifyThreeDSecure,
+} from "expo-braintree";
+
+const result: ThreeDSecureNonceResult | BTPayPalError = await verifyThreeDSecure({
+    clientToken: 'Token',
+    amount: '10.00',
+    nonce: 'card-nonce-from-tokenization',
+    email: 'customer@example.com',
+    billingAddress: {
+      givenName: 'Jill',
+      surname: 'Doe',
+      phoneNumber: '5551234567',
+      streetAddress: '555 Smith St',
+      extendedAddress: '#2',
+      locality: 'Chicago',
+      region: 'IL',
+      postalCode: '12345',
+      countryCodeAlpha2: 'US',
+    },
+    })
+
+```
+
 ## TODO
 
-- [ ] Add Missing Methods from Braintree SDK ApplePay, Google Pay, 3D
+- [ ] Add Missing Methods from Braintree SDK
 

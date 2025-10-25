@@ -27,6 +27,10 @@ enum ERROR_TYPES: String {
   case CARD_TOKENIZATION_ERROR = "CARD_TOKENIZATION_ERROR"
   case APPLE_PAY_NOT_AVAILABLE = "APPLE_PAY_NOT_AVAILABLE"
   case APPLE_PAY_TOKENIZATION_ERROR = "APPLE_PAY_TOKENIZATION_ERROR"
+  case THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY = "THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY"
+  case THREE_D_SECURE_LIABILITY_NOT_SHIFTED = "THREE_D_SECURE_LIABILITY_NOT_SHIFTED"
+  case THREE_D_SECURE_VERIFICATION_FAILED = "THREE_D_SECURE_VERIFICATION_FAILED"
+  case THREE_D_SECURE_AUTHENTICATION_FAILED = "THREE_D_SECURE_AUTHENTICATION_FAILED"
 }
 
 @objc(ExpoBraintree)
@@ -423,6 +427,71 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
       self.applePayResolve = nil
       self.applePayReject = nil
       self.applePayClientToken = nil
+    }
+  }
+
+  @objc(verifyThreeDSecure:withResolver:withRejecter:)
+  func verifyThreeDSecure(
+    options: [String: Any],
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    let clientToken = options["clientToken"] as? String ?? ""
+
+    let apiClientOptional = BTAPIClient(authorization: clientToken)
+    guard let apiClient = apiClientOptional else {
+      return reject(
+        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
+        ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue,
+        NSError(domain: ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue, code: -1)
+      )
+    }
+
+    let threeDSecureClient = BTThreeDSecureClient(apiClient: apiClient)
+    let threeDSecureRequest = prepareThreeDSecureRequest(options: options)
+
+    threeDSecureClient.startPaymentFlow(threeDSecureRequest) { threeDSecureResult, error in
+      if let error = error {
+        return reject(
+          EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
+          ERROR_TYPES.THREE_D_SECURE_AUTHENTICATION_FAILED.rawValue,
+          error as NSError
+        )
+      }
+
+      guard let threeDSecureResult = threeDSecureResult else {
+        return reject(
+          EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
+          ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue,
+          NSError(domain: ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue, code: -1)
+        )
+      }
+
+      guard let tokenizedCard = threeDSecureResult.tokenizedCard else {
+        return reject(
+          EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
+          ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue,
+          NSError(domain: ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue, code: -1)
+        )
+      }
+
+      if !tokenizedCard.threeDSecureInfo.liabilityShiftPossible {
+        return reject(
+          EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
+          ERROR_TYPES.THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY.rawValue,
+          NSError(domain: ERROR_TYPES.THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY.rawValue, code: -1)
+        )
+      }
+
+      if !tokenizedCard.threeDSecureInfo.liabilityShifted {
+        return reject(
+          EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
+          ERROR_TYPES.THREE_D_SECURE_LIABILITY_NOT_SHIFTED.rawValue,
+          NSError(domain: ERROR_TYPES.THREE_D_SECURE_LIABILITY_NOT_SHIFTED.rawValue, code: -1)
+        )
+      }
+
+      return resolve(prepareThreeDSecureNonceResult(nonce: threeDSecureResult))
     }
   }
 
