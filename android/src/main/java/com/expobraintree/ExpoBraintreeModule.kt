@@ -508,8 +508,10 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   }
 
   public fun handleThreeDSecureAuthResult(threeDSecurePaymentAuthResult: ThreeDSecurePaymentAuthResult) {
+    android.util.Log.d("ExpoBraintreeModule", "[3DS] handleThreeDSecureAuthResult called with: $threeDSecurePaymentAuthResult")
     pendingThreeDSecureRequest = false
     threeDSecureClientRef?.tokenize(threeDSecurePaymentAuthResult) { threeDSecureResult ->
+      android.util.Log.d("ExpoBraintreeModule", "[3DS] Tokenize result: $threeDSecureResult")
       when (threeDSecureResult) {
         is ThreeDSecureResult.Success -> {
           val threeDSecureNonce = threeDSecureResult.nonce
