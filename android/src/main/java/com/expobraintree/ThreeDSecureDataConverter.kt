@@ -22,19 +22,13 @@ object ThreeDSecureDataConverter {
     request.nonce = nonce
     request.email = email
 
-    if (data.hasKey("versionRequested")) {
-      val versionRequested = data.getString("versionRequested")
-      if (versionRequested == "2") {
-        request.versionRequested = ThreeDSecureRequest.VERSION_2
-      } else {
-        request.versionRequested = ThreeDSecureRequest.VERSION_1
-      }
-    } else {
-      request.versionRequested = ThreeDSecureRequest.VERSION_2
-    }
-
     if (data.hasKey("accountType")) {
-      request.accountType = data.getString("accountType")
+      val accountTypeStr = data.getString("accountType")
+      request.accountType = when (accountTypeStr) {
+        "CREDIT" -> com.braintreepayments.api.threedsecure.ThreeDSecureAccountType.CREDIT
+        "DEBIT" -> com.braintreepayments.api.threedsecure.ThreeDSecureAccountType.DEBIT
+        else -> com.braintreepayments.api.threedsecure.ThreeDSecureAccountType.UNSPECIFIED
+      }
     }
 
     if (data.hasKey("challengeRequested")) {
@@ -47,10 +41,6 @@ object ThreeDSecureDataConverter {
 
     if (data.hasKey("mobilePhoneNumber")) {
       request.mobilePhoneNumber = data.getString("mobilePhoneNumber")
-    }
-
-    if (data.hasKey("cardAddChallenge")) {
-      request.cardAddChallenge = data.getString("cardAddChallenge")
     }
 
     if (data.hasKey("billingAddress")) {
@@ -74,9 +64,6 @@ object ThreeDSecureDataConverter {
       val additionalInfoMap = data.getMap("additionalInformation")
       if (additionalInfoMap != null) {
         val additionalInfo = ThreeDSecureAdditionalInformation()
-        additionalInfo.shippingGivenName = additionalInfoMap.getString("shippingGivenName")
-        additionalInfo.shippingSurname = additionalInfoMap.getString("shippingSurname")
-        additionalInfo.shippingPhone = additionalInfoMap.getString("shippingPhone")
 
         if (additionalInfoMap.hasKey("shippingAddress")) {
           val shippingAddressMap = additionalInfoMap.getMap("shippingAddress")
@@ -116,9 +103,9 @@ object ThreeDSecureDataConverter {
     val threeDSecureInfo = Arguments.createMap()
     val info = cardNonce.threeDSecureInfo
     if (info != null) {
-      threeDSecureInfo.putBoolean("liabilityShifted", info.isLiabilityShifted)
-      threeDSecureInfo.putBoolean("liabilityShiftPossible", info.isLiabilityShiftPossible)
-      threeDSecureInfo.putBoolean("wasVerified", info.wasVerified())
+      threeDSecureInfo.putBoolean("liabilityShifted", info.liabilityShifted)
+      threeDSecureInfo.putBoolean("liabilityShiftPossible", info.liabilityShiftPossible)
+      threeDSecureInfo.putBoolean("wasVerified", info.wasVerified)
     } else {
       threeDSecureInfo.putBoolean("liabilityShifted", false)
       threeDSecureInfo.putBoolean("liabilityShiftPossible", false)

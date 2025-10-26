@@ -486,6 +486,10 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
           is ThreeDSecurePaymentAuthRequest.ReadyToLaunch -> {
             launcherBridge.launch(paymentAuthRequest)
           }
+          is ThreeDSecurePaymentAuthRequest.LaunchNotRequired -> {
+            val result = ThreeDSecureDataConverter.createThreeDSecureNonceResult(paymentAuthRequest.nonce)
+            promiseRef.resolve(result)
+          }
           is ThreeDSecurePaymentAuthRequest.Failure -> {
             handleThreeDSecureError(paymentAuthRequest.error)
           }
@@ -509,7 +513,7 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
           val threeDSecureInfo = cardNonce.threeDSecureInfo
 
           if (threeDSecureInfo != null) {
-            if (!threeDSecureInfo.isLiabilityShiftPossible) {
+            if (!threeDSecureInfo.liabilityShiftPossible) {
               promiseRef.reject(
                 EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
                 ERROR_TYPES.THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY.value,
@@ -521,7 +525,7 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
               return@tokenize
             }
 
-            if (!threeDSecureInfo.isLiabilityShifted) {
+            if (!threeDSecureInfo.liabilityShifted) {
               promiseRef.reject(
                 EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
                 ERROR_TYPES.THREE_D_SECURE_LIABILITY_NOT_SHIFTED.value,
