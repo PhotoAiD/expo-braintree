@@ -465,14 +465,10 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
     threeDSecureRequest.threeDSecureRequestDelegate = self
 
     secureClient.startPaymentFlow(threeDSecureRequest) { threeDSecureResult, error in
-      // Check for successful tokenized card first (following PR #26 suggestion)
       if let tokenizedCard = threeDSecureResult?.tokenizedCard {
-        // We have a tokenized card - return it regardless of liability shift
-        // The payment processor will decide whether to accept it
         return resolve(prepareThreeDSecureNonceResult(nonce: threeDSecureResult!))
       }
 
-      // No tokenized card - this is a real error
       if let error = error {
         return reject(
           EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
@@ -481,7 +477,6 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
         )
       }
 
-      // No result and no error - something went wrong
       return reject(
         EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
         ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue,
