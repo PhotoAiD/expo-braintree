@@ -34,7 +34,24 @@ enum ERROR_TYPES: String {
 }
 
 @objc(ExpoBraintree)
-class ExpoBraintree: NSObject {
+class ExpoBraintree: NSObject, BTThreeDSecureRequestDelegate {
+  func onLookupComplete(_ request: BTThreeDSecureRequest, result: BTThreeDSecureLookup, next: @escaping () -> Void) {
+    next()
+  }
+
+  func onPresent(_ viewController: UIViewController) {
+    DispatchQueue.main.async {
+      if let rootViewController = UIApplication.shared.delegate?.window??.rootViewController {
+        rootViewController.present(viewController, animated: true)
+      }
+    }
+  }
+
+  func onDismiss(_ viewController: UIViewController) {
+    DispatchQueue.main.async {
+      viewController.dismiss(animated: true)
+    }
+  }
 
   @objc(requestBillingAgreement:withResolver:withRejecter:)
   func requestBillingAgreement(
@@ -447,17 +464,9 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
       )
     }
 
-    guard let rootViewController = UIApplication.shared.delegate?.window??.rootViewController else {
-      return reject(
-        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-        "NO_ROOT_VIEW_CONTROLLER",
-        NSError(domain: "NO_ROOT_VIEW_CONTROLLER", code: -1)
-      )
-    }
-
     let threeDSecureClient = BTThreeDSecureClient(apiClient: apiClient)
     let threeDSecureRequest = prepareThreeDSecureRequest(options: options)
-    threeDSecureRequest.threeDSecureRequestDelegate = BTThreeDSecureRequestDelegate(presentingViewController: rootViewController)
+    threeDSecureRequest.threeDSecureRequestDelegate = self
 
     threeDSecureClient.startPaymentFlow(threeDSecureRequest) { threeDSecureResult, error in
       if let error = error {
