@@ -50,6 +50,7 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   private var googlePayClientRef: GooglePayClient? = null
   private var threeDSecureClientRef: ThreeDSecureClient? = null
   private var pendingPayPalRequest: String? = null
+  private var pendingThreeDSecureRequest: Boolean = false
   private val paypalRebornModuleHandlers: PaypalRebornModuleHandlers = PaypalRebornModuleHandlers()
 
   init {
@@ -484,6 +485,7 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
       threeDSecureClientRef!!.createPaymentAuthRequest(currentActivityRef, threeDSecureRequest) { paymentAuthRequest ->
         when (paymentAuthRequest) {
           is ThreeDSecurePaymentAuthRequest.ReadyToLaunch -> {
+            pendingThreeDSecureRequest = true
             launcherBridge.launch(paymentAuthRequest)
           }
           is ThreeDSecurePaymentAuthRequest.LaunchNotRequired -> {
@@ -506,6 +508,7 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   }
 
   public fun handleThreeDSecureAuthResult(threeDSecurePaymentAuthResult: ThreeDSecurePaymentAuthResult) {
+    pendingThreeDSecureRequest = false
     threeDSecureClientRef?.tokenize(threeDSecurePaymentAuthResult) { threeDSecureResult ->
       when (threeDSecureResult) {
         is ThreeDSecureResult.Success -> {
@@ -569,7 +572,13 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     // V5: Browser switch handling now done via PayPalLauncher and handlePayPalReturnToApp
     // Handle PayPal cancellation: If we have a pending PayPal request when resuming, check if we have a valid intent
     // If not, the user likely cancelled by pressing X
-    android.util.Log.d("ExpoBraintreeModule", "[Resume] onHostResume called, pendingPayPalRequest: $pendingPayPalRequest")
+    android.util.Log.d("ExpoBraintreeModule", "[Resume] onHostResume called, pendingPayPalRequest: $pendingPayPalRequest, pendingThreeDSecureRequest: $pendingThreeDSecureRequest")
+
+    // Don't cancel anything if 3DS is in progress - it handles its own lifecycle
+    if (pendingThreeDSecureRequest) {
+      android.util.Log.d("ExpoBraintreeModule", "[Resume] 3DS in progress, skipping cancellation logic")
+      return
+    }
 
     if (pendingPayPalRequest != null && this::currentActivityRef.isInitialized) {
       val currentIntent = currentActivityRef.intent
