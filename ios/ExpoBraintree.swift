@@ -465,6 +465,19 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
     threeDSecureRequest.threeDSecureRequestDelegate = self
 
     secureClient.startPaymentFlow(threeDSecureRequest) { threeDSecureResult, error in
+      // Debug logging
+      print("🔐 3DS Callback - hasResult: \(threeDSecureResult != nil), hasError: \(error != nil)")
+      if let result = threeDSecureResult {
+        print("🔐 3DS Result - hasTokenizedCard: \(result.tokenizedCard != nil)")
+        if let card = result.tokenizedCard {
+          print("🔐 3DS Card - nonce: \(card.nonce), isEmpty: \(card.nonce.isEmpty)")
+          print("🔐 3DS Info - liabilityShifted: \(card.threeDSecureInfo.liabilityShifted), wasVerified: \(card.threeDSecureInfo.wasVerified), liabilityShiftPossible: \(card.threeDSecureInfo.liabilityShiftPossible)")
+        }
+      }
+      if let err = error {
+        print("🔐 3DS Error - \(err.localizedDescription)")
+      }
+
       // Always check for tokenizedCard first, even if error is present
       if let tokenizedCard = threeDSecureResult?.tokenizedCard, !tokenizedCard.nonce.isEmpty {
         // Success: we have a valid nonce
