@@ -53,6 +53,11 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   private var pendingThreeDSecureRequest: Boolean = false
   private val paypalRebornModuleHandlers: PaypalRebornModuleHandlers = PaypalRebornModuleHandlers()
 
+  companion object {
+    @Volatile
+    var pendingThreeDSecureJwt: String? = null
+  }
+
   init {
     this.reactContextRef = reactContext
     reactContext.addLifecycleEventListener(this)
@@ -574,7 +579,21 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     // V5: Browser switch handling now done via PayPalLauncher and handlePayPalReturnToApp
     // Handle PayPal cancellation: If we have a pending PayPal request when resuming, check if we have a valid intent
     // If not, the user likely cancelled by pressing X
-    android.util.Log.d("ExpoBraintreeModule", "[Resume] onHostResume called, pendingPayPalRequest: $pendingPayPalRequest, pendingThreeDSecureRequest: $pendingThreeDSecureRequest")
+    android.util.Log.d("ExpoBraintreeModule", "[Resume] onHostResume called, pendingPayPalRequest: $pendingPayPalRequest, pendingThreeDSecureRequest: $pendingThreeDSecureRequest, static3dsJwt: ${pendingThreeDSecureJwt != null}")
+
+    // Check for pending 3DS result in companion object
+    if (pendingThreeDSecureRequest && pendingThreeDSecureJwt != null) {
+      android.util.Log.d("ExpoBraintreeModule", "[3DS] Found pending 3DS JWT in companion object, processing...")
+
+      val jwt = pendingThreeDSecureJwt!!
+      // Clear it immediately
+      pendingThreeDSecureJwt = null
+
+      // Create a ThreeDSecurePaymentAuthResult.Success with the JWT
+      val result = com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthResult.Success(jwt)
+      handleThreeDSecureAuthResult(result)
+      return
+    }
 
     // Don't cancel anything if 3DS is in progress - it handles its own lifecycle
     if (pendingThreeDSecureRequest) {
