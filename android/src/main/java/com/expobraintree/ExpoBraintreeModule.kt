@@ -509,36 +509,34 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     threeDSecureClientRef?.tokenize(threeDSecurePaymentAuthResult) { threeDSecureResult ->
       when (threeDSecureResult) {
         is ThreeDSecureResult.Success -> {
-          val cardNonce = threeDSecureResult.nonce
-          val threeDSecureInfo = cardNonce.threeDSecureInfo
+          val threeDSecureNonce = threeDSecureResult.nonce
+          val threeDSecureInfo = threeDSecureNonce.threeDSecureInfo
 
-          if (threeDSecureInfo != null) {
-            if (!threeDSecureInfo.liabilityShiftPossible) {
-              promiseRef.reject(
+          if (!threeDSecureInfo.liabilityShiftPossible) {
+            promiseRef.reject(
+              EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
+              ERROR_TYPES.THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY.value,
+              PaypalDataConverter.createError(
                 EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
-                ERROR_TYPES.THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY.value,
-                PaypalDataConverter.createError(
-                  EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
-                  "3D Secure liability shift not possible"
-                )
+                "3D Secure liability shift not possible"
               )
-              return@tokenize
-            }
-
-            if (!threeDSecureInfo.liabilityShifted) {
-              promiseRef.reject(
-                EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
-                ERROR_TYPES.THREE_D_SECURE_LIABILITY_NOT_SHIFTED.value,
-                PaypalDataConverter.createError(
-                  EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
-                  "3D Secure liability not shifted"
-                )
-              )
-              return@tokenize
-            }
+            )
+            return@tokenize
           }
 
-          val result = ThreeDSecureDataConverter.createThreeDSecureNonceResult(cardNonce)
+          if (!threeDSecureInfo.liabilityShifted) {
+            promiseRef.reject(
+              EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
+              ERROR_TYPES.THREE_D_SECURE_LIABILITY_NOT_SHIFTED.value,
+              PaypalDataConverter.createError(
+                EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
+                "3D Secure liability not shifted"
+              )
+            )
+            return@tokenize
+          }
+
+          val result = ThreeDSecureDataConverter.createThreeDSecureNonceResult(threeDSecureNonce)
           promiseRef.resolve(result)
         }
         is ThreeDSecureResult.Failure -> {

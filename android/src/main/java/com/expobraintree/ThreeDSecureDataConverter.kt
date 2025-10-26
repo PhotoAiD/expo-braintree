@@ -5,7 +5,7 @@ import com.braintreepayments.api.threedsecure.ThreeDSecurePostalAddress
 import com.braintreepayments.api.threedsecure.ThreeDSecureRequest
 import com.braintreepayments.api.threedsecure.ThreeDSecureV2ButtonType
 import com.braintreepayments.api.threedsecure.ThreeDSecureV2UiCustomization
-import com.braintreepayments.api.card.CardNonce
+import com.braintreepayments.api.threedsecure.ThreeDSecureNonce
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableMap
@@ -27,7 +27,7 @@ object ThreeDSecureDataConverter {
       request.accountType = when (accountTypeStr) {
         "CREDIT" -> com.braintreepayments.api.threedsecure.ThreeDSecureAccountType.CREDIT
         "DEBIT" -> com.braintreepayments.api.threedsecure.ThreeDSecureAccountType.DEBIT
-        else -> com.braintreepayments.api.threedsecure.ThreeDSecureAccountType.UNSPECIFIED
+        else -> null
       }
     }
 
@@ -89,28 +89,22 @@ object ThreeDSecureDataConverter {
     return request
   }
 
-  fun createThreeDSecureNonceResult(cardNonce: CardNonce): WritableMap {
+  fun createThreeDSecureNonceResult(threeDSecureNonce: ThreeDSecureNonce): WritableMap {
     val result = Arguments.createMap()
-    result.putString("nonce", cardNonce.string)
-    result.putString("cardNetwork", cardNonce.cardType)
-    result.putString("lastTwo", cardNonce.lastTwo)
-    result.putString("lastFour", cardNonce.lastFour)
-    result.putString("expirationMonth", cardNonce.expirationMonth)
-    result.putString("expirationYear", cardNonce.expirationYear)
-    result.putString("bin", cardNonce.bin)
-    result.putString("cardType", cardNonce.cardType)
+    result.putString("nonce", threeDSecureNonce.string)
+    result.putString("cardNetwork", threeDSecureNonce.cardType)
+    result.putString("lastTwo", threeDSecureNonce.lastTwo)
+    result.putString("lastFour", threeDSecureNonce.lastFour)
+    result.putString("expirationMonth", threeDSecureNonce.expirationMonth)
+    result.putString("expirationYear", threeDSecureNonce.expirationYear)
+    result.putString("bin", threeDSecureNonce.bin)
+    result.putString("cardType", threeDSecureNonce.cardType)
 
     val threeDSecureInfo = Arguments.createMap()
-    val info = cardNonce.threeDSecureInfo
-    if (info != null) {
-      threeDSecureInfo.putBoolean("liabilityShifted", info.liabilityShifted)
-      threeDSecureInfo.putBoolean("liabilityShiftPossible", info.liabilityShiftPossible)
-      threeDSecureInfo.putBoolean("wasVerified", info.wasVerified)
-    } else {
-      threeDSecureInfo.putBoolean("liabilityShifted", false)
-      threeDSecureInfo.putBoolean("liabilityShiftPossible", false)
-      threeDSecureInfo.putBoolean("wasVerified", false)
-    }
+    val info = threeDSecureNonce.threeDSecureInfo
+    threeDSecureInfo.putBoolean("liabilityShifted", info.liabilityShifted)
+    threeDSecureInfo.putBoolean("liabilityShiftPossible", info.liabilityShiftPossible)
+    threeDSecureInfo.putBoolean("wasVerified", info.wasVerified)
 
     result.putMap("threeDSecureInfo", threeDSecureInfo)
     return result
