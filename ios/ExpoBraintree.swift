@@ -475,22 +475,6 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
         )
       }
 
-      if !tokenizedCard.threeDSecureInfo.liabilityShiftPossible {
-        return reject(
-          EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
-          ERROR_TYPES.THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY.rawValue,
-          NSError(domain: ERROR_TYPES.THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY.rawValue, code: -1)
-        )
-      }
-
-      if !tokenizedCard.threeDSecureInfo.liabilityShifted {
-        return reject(
-          EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
-          ERROR_TYPES.THREE_D_SECURE_LIABILITY_NOT_SHIFTED.rawValue,
-          NSError(domain: ERROR_TYPES.THREE_D_SECURE_LIABILITY_NOT_SHIFTED.rawValue, code: -1)
-        )
-      }
-
       return resolve(prepareThreeDSecureNonceResult(nonce: threeDSecureResult))
     }
   }
