@@ -14,14 +14,6 @@ func prepareThreeDSecureRequest(options: [String: Any]) -> BTThreeDSecureRequest
   threeDSecureRequest.nonce = options["nonce"] as? String
   threeDSecureRequest.email = options["email"] as? String
 
-  if let versionRequested = options["versionRequested"] as? String {
-    if versionRequested == "2" {
-      threeDSecureRequest.versionRequested = .version2
-    } else if versionRequested == "1" {
-      threeDSecureRequest.versionRequested = .version1
-    }
-  }
-
   if let accountType = options["accountType"] as? String {
     if accountType == "credit" {
       threeDSecureRequest.accountType = .credit
@@ -38,16 +30,16 @@ func prepareThreeDSecureRequest(options: [String: Any]) -> BTThreeDSecureRequest
     threeDSecureRequest.exemptionRequested = exemptionRequested
   }
 
+  if let dataOnlyRequested = options["dataOnlyRequested"] as? Bool {
+    threeDSecureRequest.dataOnlyRequested = dataOnlyRequested
+  }
+
   if let mobilePhoneNumber = options["mobilePhoneNumber"] as? String {
     threeDSecureRequest.mobilePhoneNumber = mobilePhoneNumber
   }
 
-  if let cardAddChallenge = options["cardAddChallenge"] as? String {
-    if cardAddChallenge == "requested" {
-      threeDSecureRequest.cardAddChallenge = .requested
-    } else if cardAddChallenge == "not_requested" {
-      threeDSecureRequest.cardAddChallenge = .notRequested
-    }
+  if let cardAddChallengeRequested = options["cardAddChallengeRequested"] as? Bool {
+    threeDSecureRequest.cardAddChallengeRequested = cardAddChallengeRequested
   }
 
   if let billingAddressDict = options["billingAddress"] as? [String: String] {
