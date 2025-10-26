@@ -590,7 +590,7 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
       pendingThreeDSecureJwt = null
 
       // Create a ThreeDSecurePaymentAuthResult.Success with the JWT
-      val result = com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthResult.Success(jwt)
+      val result = ThreeDSecurePaymentAuthResult.Success(jwt)
       handleThreeDSecureAuthResult(result)
       return
     }
