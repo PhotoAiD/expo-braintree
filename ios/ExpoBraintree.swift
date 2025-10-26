@@ -35,6 +35,8 @@ enum ERROR_TYPES: String {
 
 @objc(ExpoBraintree)
 class ExpoBraintree: NSObject, BTThreeDSecureRequestDelegate {
+  var threeDSecureClient: BTThreeDSecureClient? = nil
+
   func onLookupComplete(_ request: BTThreeDSecureRequest, lookupResult: BTThreeDSecureResult, next: @escaping () -> Void) {
     next()
   }
@@ -450,36 +452,36 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
       )
     }
 
-    let threeDSecureClient = BTThreeDSecureClient(apiClient: apiClient)
+    self.threeDSecureClient = BTThreeDSecureClient(apiClient: apiClient)
+    guard let secureClient = self.threeDSecureClient else {
+      return reject(
+        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
+        ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue,
+        NSError(domain: ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue, code: -1)
+      )
+    }
+
     let threeDSecureRequest = prepareThreeDSecureRequest(options: options)
     threeDSecureRequest.threeDSecureRequestDelegate = self
 
-    threeDSecureClient.startPaymentFlow(threeDSecureRequest) { threeDSecureResult, error in
-      if let error = error {
+    secureClient.startPaymentFlow(threeDSecureRequest) { threeDSecureResult, error in
+      if let tokenizedCard = threeDSecureResult?.tokenizedCard {
+        if (tokenizedCard.nonce ?? "").isEmpty {
+          return reject(
+            EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
+            ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue,
+            NSError(domain: ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue, code: -1)
+          )
+        }
+
+        return resolve(prepareThreeDSecureNonceResult(nonce: threeDSecureResult!))
+      } else if let error = error {
         return reject(
           EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
           ERROR_TYPES.THREE_D_SECURE_AUTHENTICATION_FAILED.rawValue,
           error as NSError
         )
       }
-
-      guard let threeDSecureResult = threeDSecureResult else {
-        return reject(
-          EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
-          ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue,
-          NSError(domain: ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue, code: -1)
-        )
-      }
-
-      guard let tokenizedCard = threeDSecureResult.tokenizedCard else {
-        return reject(
-          EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
-          ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue,
-          NSError(domain: ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue, code: -1)
-        )
-      }
-
-      return resolve(prepareThreeDSecureNonceResult(nonce: threeDSecureResult))
     }
   }
 

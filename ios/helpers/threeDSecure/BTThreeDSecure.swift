@@ -3,7 +3,6 @@ import Foundation
 
 func prepareThreeDSecureRequest(options: [String: Any]) -> BTThreeDSecureRequest {
   let threeDSecureRequest = BTThreeDSecureRequest()
-
   let formatter = NumberFormatter()
   formatter.generatesDecimalNumbers = true
 
@@ -14,67 +13,22 @@ func prepareThreeDSecureRequest(options: [String: Any]) -> BTThreeDSecureRequest
   threeDSecureRequest.nonce = options["nonce"] as? String
   threeDSecureRequest.email = options["email"] as? String
 
-  if let accountType = options["accountType"] as? String {
-    if accountType == "credit" {
-      threeDSecureRequest.accountType = .credit
-    } else if accountType == "debit" {
-      threeDSecureRequest.accountType = .debit
-    }
-  }
+  let threeDsRequestPostalAddress = BTThreeDSecurePostalAddress()
+  threeDsRequestPostalAddress.givenName = options["givenName"] as? String
+  threeDsRequestPostalAddress.surname = options["surName"] as? String
+  threeDsRequestPostalAddress.phoneNumber = options["phoneNumber"] as? String
+  threeDsRequestPostalAddress.streetAddress = options["streetAddress"] as? String
+  threeDsRequestPostalAddress.extendedAddress = options["extendedAddress"] as? String
+  threeDsRequestPostalAddress.locality = options["city"] as? String
+  threeDsRequestPostalAddress.postalCode = options["postalCode"] as? String
+  threeDsRequestPostalAddress.region = options["region"] as? String
+  threeDsRequestPostalAddress.countryCodeAlpha2 = options["countryCodeAlpha2"] as? String
 
-  if let challengeRequested = options["challengeRequested"] as? Bool {
-    threeDSecureRequest.challengeRequested = challengeRequested
-  }
+  let threeDsRequestAdditionalInformation = BTThreeDSecureAdditionalInformation()
+  threeDsRequestAdditionalInformation.shippingAddress = threeDsRequestPostalAddress
 
-  if let exemptionRequested = options["exemptionRequested"] as? Bool {
-    threeDSecureRequest.exemptionRequested = exemptionRequested
-  }
-
-  if let dataOnlyRequested = options["dataOnlyRequested"] as? Bool {
-    threeDSecureRequest.dataOnlyRequested = dataOnlyRequested
-  }
-
-  if let mobilePhoneNumber = options["mobilePhoneNumber"] as? String {
-    threeDSecureRequest.mobilePhoneNumber = mobilePhoneNumber
-  }
-
-  if let cardAddChallengeRequested = options["cardAddChallengeRequested"] as? Bool {
-    threeDSecureRequest.cardAddChallengeRequested = cardAddChallengeRequested
-  }
-
-  if let billingAddressDict = options["billingAddress"] as? [String: String] {
-    let billingAddress = BTThreeDSecurePostalAddress()
-    billingAddress.givenName = billingAddressDict["givenName"]
-    billingAddress.surname = billingAddressDict["surname"]
-    billingAddress.phoneNumber = billingAddressDict["phoneNumber"]
-    billingAddress.streetAddress = billingAddressDict["streetAddress"]
-    billingAddress.extendedAddress = billingAddressDict["extendedAddress"]
-    billingAddress.locality = billingAddressDict["locality"]
-    billingAddress.region = billingAddressDict["region"]
-    billingAddress.postalCode = billingAddressDict["postalCode"]
-    billingAddress.countryCodeAlpha2 = billingAddressDict["countryCodeAlpha2"]
-    threeDSecureRequest.billingAddress = billingAddress
-  }
-
-  if let additionalInfoDict = options["additionalInformation"] as? [String: Any] {
-    let additionalInfo = BTThreeDSecureAdditionalInformation()
-
-    if let shippingAddressDict = additionalInfoDict["shippingAddress"] as? [String: String] {
-      let shippingAddress = BTThreeDSecurePostalAddress()
-      shippingAddress.givenName = shippingAddressDict["givenName"]
-      shippingAddress.surname = shippingAddressDict["surname"]
-      shippingAddress.phoneNumber = shippingAddressDict["phoneNumber"]
-      shippingAddress.streetAddress = shippingAddressDict["streetAddress"]
-      shippingAddress.extendedAddress = shippingAddressDict["extendedAddress"]
-      shippingAddress.locality = shippingAddressDict["locality"]
-      shippingAddress.region = shippingAddressDict["region"]
-      shippingAddress.postalCode = shippingAddressDict["postalCode"]
-      shippingAddress.countryCodeAlpha2 = shippingAddressDict["countryCodeAlpha2"]
-      additionalInfo.shippingAddress = shippingAddress
-    }
-
-    threeDSecureRequest.additionalInformation = additionalInfo
-  }
+  threeDSecureRequest.additionalInformation = threeDsRequestAdditionalInformation
+  threeDSecureRequest.billingAddress = threeDsRequestPostalAddress
 
   return threeDSecureRequest
 }
