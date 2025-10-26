@@ -5,6 +5,8 @@ func prepareThreeDSecureRequest(options: [String: Any]) -> BTThreeDSecureRequest
   let threeDSecureRequest = BTThreeDSecureRequest()
   let formatter = NumberFormatter()
   formatter.generatesDecimalNumbers = true
+  formatter.locale = Locale(identifier: "en_US_POSIX")
+  formatter.numberStyle = .decimal
 
   if let amountString = options["amount"] as? String {
     threeDSecureRequest.amount = formatter.number(from: amountString) as? NSDecimalNumber ?? 0
