@@ -1,8 +1,8 @@
 package com.expobraintree
 
 import androidx.activity.result.ActivityResultLauncher
-import com.braintreepayments.api.threeDSecure.ThreeDSecurePaymentAuthRequest
-import com.braintreepayments.api.threeDSecure.ThreeDSecurePaymentAuthResult
+import com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthRequest
+import com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthResult
 
 class ThreeDSecureLauncherBridge private constructor() {
 

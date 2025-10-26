@@ -25,11 +25,11 @@ import com.braintreepayments.api.googlepay.GooglePayPaymentAuthRequest
 import com.braintreepayments.api.googlepay.GooglePayPaymentAuthResult
 import com.braintreepayments.api.googlepay.GooglePayResult
 import com.braintreepayments.api.googlepay.GooglePayReadinessResult
-import com.braintreepayments.api.threeDSecure.ThreeDSecureClient
-import com.braintreepayments.api.threeDSecure.ThreeDSecureRequest
-import com.braintreepayments.api.threeDSecure.ThreeDSecurePaymentAuthRequest
-import com.braintreepayments.api.threeDSecure.ThreeDSecurePaymentAuthResult
-import com.braintreepayments.api.threeDSecure.ThreeDSecureResult
+import com.braintreepayments.api.threedsecure.ThreeDSecureClient
+import com.braintreepayments.api.threedsecure.ThreeDSecureRequest
+import com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthRequest
+import com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthResult
+import com.braintreepayments.api.threedsecure.ThreeDSecureResult
 import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise

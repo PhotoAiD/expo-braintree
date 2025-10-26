@@ -1,10 +1,10 @@
 package com.expobraintree
 
-import com.braintreepayments.api.threeDSecure.ThreeDSecureAdditionalInformation
-import com.braintreepayments.api.threeDSecure.ThreeDSecurePostalAddress
-import com.braintreepayments.api.threeDSecure.ThreeDSecureRequest
-import com.braintreepayments.api.threeDSecure.ThreeDSecureV2ButtonType
-import com.braintreepayments.api.threeDSecure.ThreeDSecureV2UiCustomization
+import com.braintreepayments.api.threedsecure.ThreeDSecureAdditionalInformation
+import com.braintreepayments.api.threedsecure.ThreeDSecurePostalAddress
+import com.braintreepayments.api.threedsecure.ThreeDSecureRequest
+import com.braintreepayments.api.threedsecure.ThreeDSecureV2ButtonType
+import com.braintreepayments.api.threedsecure.ThreeDSecureV2UiCustomization
 import com.braintreepayments.api.card.CardNonce
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
