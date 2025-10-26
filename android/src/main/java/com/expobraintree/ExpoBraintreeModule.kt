@@ -51,14 +51,11 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   private var threeDSecureClientRef: ThreeDSecureClient? = null
   private var pendingPayPalRequest: String? = null
   private var pendingThreeDSecureRequest: Boolean = false
-  private var pendingThreeDSecureAuthRequest: ThreeDSecurePaymentAuthRequest.ReadyToLaunch? = null
   private val paypalRebornModuleHandlers: PaypalRebornModuleHandlers = PaypalRebornModuleHandlers()
 
   companion object {
     @Volatile
     var pendingThreeDSecureResult: ThreeDSecurePaymentAuthResult? = null
-    @Volatile
-    var needsThreeDSecureRelaunch: Boolean = false
   }
 
   init {
@@ -494,7 +491,6 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
         when (paymentAuthRequest) {
           is ThreeDSecurePaymentAuthRequest.ReadyToLaunch -> {
             pendingThreeDSecureRequest = true
-            pendingThreeDSecureAuthRequest = paymentAuthRequest
             launcherBridge.launch(paymentAuthRequest)
           }
           is ThreeDSecurePaymentAuthRequest.LaunchNotRequired -> {
@@ -583,31 +579,15 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
     // V5: Browser switch handling now done via PayPalLauncher and handlePayPalReturnToApp
     // Handle PayPal cancellation: If we have a pending PayPal request when resuming, check if we have a valid intent
     // If not, the user likely cancelled by pressing X
-    android.util.Log.d("ExpoBraintreeModule", "[Resume] onHostResume called, pendingPayPalRequest: $pendingPayPalRequest, pendingThreeDSecureRequest: $pendingThreeDSecureRequest, static3dsResult: ${pendingThreeDSecureResult != null}, needsRelaunch: $needsThreeDSecureRelaunch")
-
-    // Check if we need to re-launch 3DS after backgrounding
-    if (needsThreeDSecureRelaunch && pendingThreeDSecureAuthRequest != null) {
-      android.util.Log.d("ExpoBraintreeModule", "[3DS] Re-launching 3DS challenge after background")
-      needsThreeDSecureRelaunch = false
-
-      val launcherBridge = ThreeDSecureLauncherBridge.getInstance()
-      if (launcherBridge != null && this::currentActivityRef.isInitialized) {
-        launcherBridge.launch(pendingThreeDSecureAuthRequest!!)
-      } else {
-        android.util.Log.e("ExpoBraintreeModule", "[3DS] Cannot re-launch: launcher or activity not available")
-      }
-      return
-    }
+    android.util.Log.d("ExpoBraintreeModule", "[Resume] onHostResume called, pendingPayPalRequest: $pendingPayPalRequest, pendingThreeDSecureRequest: $pendingThreeDSecureRequest, static3dsResult: ${pendingThreeDSecureResult != null}")
 
     // Check for pending 3DS result in companion object
     if (pendingThreeDSecureRequest && pendingThreeDSecureResult != null) {
       android.util.Log.d("ExpoBraintreeModule", "[3DS] Found pending 3DS result in companion object, processing...")
 
       val result = pendingThreeDSecureResult!!
-      // Clear it immediately
       pendingThreeDSecureResult = null
 
-      // Process the stored result
       handleThreeDSecureAuthResult(result)
       return
     }
