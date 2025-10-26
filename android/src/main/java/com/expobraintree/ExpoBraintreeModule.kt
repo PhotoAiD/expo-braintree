@@ -515,6 +515,12 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   public fun handleThreeDSecureAuthResult(threeDSecurePaymentAuthResult: ThreeDSecurePaymentAuthResult) {
     android.util.Log.d("ExpoBraintreeModule", "[3DS] Processing 3D Secure authentication result")
     pendingThreeDSecureRequest = false
+
+    // Clear persistent state since we're processing the result
+    val prefs = reactContextRef.getSharedPreferences("expo_braintree_3ds", android.content.Context.MODE_PRIVATE)
+    prefs.edit().clear().apply()
+    android.util.Log.d("ExpoBraintreeModule", "[3DS] Cleared persistent 3DS state")
+
     threeDSecureClientRef?.tokenize(threeDSecurePaymentAuthResult) { threeDSecureResult ->
       android.util.Log.d("ExpoBraintreeModule", "[3DS] Tokenization completed")
       when (threeDSecureResult) {
@@ -576,25 +582,63 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
   }
 
   override fun onHostResume() {
-    // V5: Browser switch handling now done via PayPalLauncher and handlePayPalReturnToApp
-    // Handle PayPal cancellation: If we have a pending PayPal request when resuming, check if we have a valid intent
-    // If not, the user likely cancelled by pressing X
     android.util.Log.d("ExpoBraintreeModule", "[Resume] onHostResume called, pendingPayPalRequest: $pendingPayPalRequest, pendingThreeDSecureRequest: $pendingThreeDSecureRequest, static3dsResult: ${pendingThreeDSecureResult != null}")
 
-    // Check for pending 3DS result in companion object
+    // Check for pending 3DS result in companion object with retry mechanism
     if (pendingThreeDSecureRequest && pendingThreeDSecureResult != null) {
       android.util.Log.d("ExpoBraintreeModule", "[3DS] Found pending 3DS result in companion object, processing...")
 
       val result = pendingThreeDSecureResult!!
       pendingThreeDSecureResult = null
 
-      handleThreeDSecureAuthResult(result)
+      // Use handler to ensure React context is fully ready
+      android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+        try {
+          handleThreeDSecureAuthResult(result)
+          android.util.Log.d("ExpoBraintreeModule", "[3DS] Successfully processed pending result")
+        } catch (e: Exception) {
+          android.util.Log.e("ExpoBraintreeModule", "[3DS] Error processing pending result", e)
+          if (this::promiseRef.isInitialized) {
+            promiseRef.reject(
+              EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value,
+              ERROR_TYPES.THREE_D_SECURE_AUTHENTICATION_FAILED.value,
+              PaypalDataConverter.createError(EXCEPTION_TYPES.TOKENIZE_EXCEPTION.value, "Failed to process 3D Secure result")
+            )
+          }
+        }
+      }, 300)
       return
     }
 
-    // Don't cancel anything if 3DS is in progress - it handles its own lifecycle
-    if (pendingThreeDSecureRequest) {
-      android.util.Log.d("ExpoBraintreeModule", "[Resume] 3DS in progress, skipping cancellation logic")
+    // Check for abandoned 3DS flows using SharedPreferences
+    if (pendingThreeDSecureRequest && this::currentActivityRef.isInitialized) {
+      val prefs = reactContextRef.getSharedPreferences("expo_braintree_3ds", android.content.Context.MODE_PRIVATE)
+      val pendingResultType = prefs.getString("pending_result_type", null)
+      val pendingTimestamp = prefs.getLong("pending_result_timestamp", 0)
+
+      if (pendingResultType != null && pendingTimestamp > 0) {
+        val elapsedTime = System.currentTimeMillis() - pendingTimestamp
+        val timeoutMs = 5 * 60 * 1000
+
+        android.util.Log.d("ExpoBraintreeModule", "[3DS] Found persistent pending state: $pendingResultType, elapsed: ${elapsedTime}ms")
+
+        if (elapsedTime > timeoutMs) {
+          android.util.Log.d("ExpoBraintreeModule", "[3DS] 3DS flow timed out after ${elapsedTime}ms, treating as cancellation")
+          prefs.edit().clear().apply()
+          pendingThreeDSecureRequest = false
+
+          if (this::promiseRef.isInitialized) {
+            promiseRef.reject(
+              EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value,
+              ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.value,
+              PaypalDataConverter.createError(EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.value, "3D Secure authentication timed out")
+            )
+          }
+          return
+        } else {
+          android.util.Log.d("ExpoBraintreeModule", "[3DS] 3DS still in progress (${elapsedTime}ms elapsed), continuing to wait")
+        }
+      }
       return
     }
 
@@ -605,12 +649,9 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
       } ?: false
 
       if (!hasPayPalData) {
-        // User returned to app without completing PayPal - treat as cancellation
         android.util.Log.d("ExpoBraintreeModule", "[Resume] No PayPal data found, treating as cancellation")
 
-        // Use a short delay to allow onNewIntent to fire first if it's coming
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-          // Double check pendingPayPalRequest still exists (it might have been cleared by onNewIntent)
           if (pendingPayPalRequest != null) {
             android.util.Log.d("ExpoBraintreeModule", "[Resume] Still no PayPal data after delay, rejecting promise")
             pendingPayPalRequest = null
@@ -622,9 +663,8 @@ class ExpoBraintreeModule(reactContext: ReactApplicationContext) :
               )
             }
           }
-        }, 500) // 500ms delay to allow onNewIntent to fire if it's coming
+        }, 500)
       } else {
-        // Has PayPal data, let onNewIntent handle it
         android.util.Log.d("ExpoBraintreeModule", "[Resume] Has PayPal data, letting onNewIntent handle it")
       }
     }
