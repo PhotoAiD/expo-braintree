@@ -2,12 +2,16 @@ package com.expobraintree
 
 import com.braintreepayments.api.threedsecure.ThreeDSecureLauncher
 import com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthRequest
+import com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthResult
 
 interface ThreeDSecureLauncherBridge {
     fun launch(paymentAuthRequest: ThreeDSecurePaymentAuthRequest.ReadyToLaunch)
 
     companion object {
         private var instance: ThreeDSecureLauncherBridge? = null
+
+        @Volatile
+        var pendingResult: ThreeDSecurePaymentAuthResult? = null
 
         fun getInstance(): ThreeDSecureLauncherBridge? = instance
 
