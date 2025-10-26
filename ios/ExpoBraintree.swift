@@ -447,8 +447,17 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
       )
     }
 
+    guard let rootViewController = UIApplication.shared.delegate?.window??.rootViewController else {
+      return reject(
+        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
+        "NO_ROOT_VIEW_CONTROLLER",
+        NSError(domain: "NO_ROOT_VIEW_CONTROLLER", code: -1)
+      )
+    }
+
     let threeDSecureClient = BTThreeDSecureClient(apiClient: apiClient)
     let threeDSecureRequest = prepareThreeDSecureRequest(options: options)
+    threeDSecureRequest.threeDSecureRequestDelegate = BTThreeDSecureRequestDelegate(presentingViewController: rootViewController)
 
     threeDSecureClient.startPaymentFlow(threeDSecureRequest) { threeDSecureResult, error in
       if let error = error {
