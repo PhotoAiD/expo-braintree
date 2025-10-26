@@ -465,23 +465,27 @@ extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
     threeDSecureRequest.threeDSecureRequestDelegate = self
 
     secureClient.startPaymentFlow(threeDSecureRequest) { threeDSecureResult, error in
-      if let tokenizedCard = threeDSecureResult?.tokenizedCard {
-        if (tokenizedCard.nonce ?? "").isEmpty {
-          return reject(
-            EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
-            ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue,
-            NSError(domain: ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue, code: -1)
-          )
-        }
-
+      // Always check for tokenizedCard first, even if error is present
+      if let tokenizedCard = threeDSecureResult?.tokenizedCard, !tokenizedCard.nonce.isEmpty {
+        // Success: we have a valid nonce
         return resolve(prepareThreeDSecureNonceResult(nonce: threeDSecureResult!))
-      } else if let error = error {
+      }
+
+      // If we get here, either no result or no valid nonce
+      if let error = error {
         return reject(
           EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
           ERROR_TYPES.THREE_D_SECURE_AUTHENTICATION_FAILED.rawValue,
           error as NSError
         )
       }
+
+      // No result and no error - something went wrong
+      return reject(
+        EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
+        ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue,
+        NSError(domain: ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue, code: -1)
+      )
     }
   }
 
