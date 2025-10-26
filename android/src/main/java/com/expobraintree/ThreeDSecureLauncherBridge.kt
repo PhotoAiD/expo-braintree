@@ -1,5 +1,7 @@
 package com.expobraintree
 
+import android.os.Handler
+import android.os.Looper
 import com.braintreepayments.api.threedsecure.ThreeDSecureLauncher
 import com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthRequest
 
@@ -26,6 +28,9 @@ class ThreeDSecureLauncherBridge private constructor() {
   }
 
   fun launch(paymentAuthRequest: ThreeDSecurePaymentAuthRequest.ReadyToLaunch) {
-    threeDSecureLauncher?.launch(paymentAuthRequest)
+    // Ensure launch happens on UI thread
+    Handler(Looper.getMainLooper()).post {
+      threeDSecureLauncher?.launch(paymentAuthRequest)
+    }
   }
 }
