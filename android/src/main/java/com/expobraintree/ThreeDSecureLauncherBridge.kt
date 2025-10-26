@@ -1,12 +1,11 @@
 package com.expobraintree
 
-import androidx.activity.result.ActivityResultLauncher
+import com.braintreepayments.api.threedsecure.ThreeDSecureLauncher
 import com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthRequest
-import com.braintreepayments.api.threedsecure.ThreeDSecurePaymentAuthResult
 
 class ThreeDSecureLauncherBridge private constructor() {
 
-  private var threeDSecureLauncher: ActivityResultLauncher<ThreeDSecurePaymentAuthRequest.ReadyToLaunch>? = null
+  private var threeDSecureLauncher: ThreeDSecureLauncher? = null
 
   companion object {
     @Volatile
@@ -16,7 +15,7 @@ class ThreeDSecureLauncherBridge private constructor() {
       return INSTANCE
     }
 
-    fun initialize(launcher: ActivityResultLauncher<ThreeDSecurePaymentAuthRequest.ReadyToLaunch>): ThreeDSecureLauncherBridge {
+    fun initialize(launcher: ThreeDSecureLauncher): ThreeDSecureLauncherBridge {
       return INSTANCE ?: synchronized(this) {
         INSTANCE ?: ThreeDSecureLauncherBridge().also {
           it.threeDSecureLauncher = launcher
