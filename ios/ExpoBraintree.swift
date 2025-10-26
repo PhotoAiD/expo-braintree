@@ -35,22 +35,8 @@ enum ERROR_TYPES: String {
 
 @objc(ExpoBraintree)
 class ExpoBraintree: NSObject, BTThreeDSecureRequestDelegate {
-  func onLookupComplete(_ request: BTThreeDSecureRequest, result: BTThreeDSecureLookup, next: @escaping () -> Void) {
+  func onLookupComplete(_ request: BTThreeDSecureRequest, lookupResult: BTThreeDSecureResult, next: @escaping () -> Void) {
     next()
-  }
-
-  func onPresent(_ viewController: UIViewController) {
-    DispatchQueue.main.async {
-      if let rootViewController = UIApplication.shared.delegate?.window??.rootViewController {
-        rootViewController.present(viewController, animated: true)
-      }
-    }
-  }
-
-  func onDismiss(_ viewController: UIViewController) {
-    DispatchQueue.main.async {
-      viewController.dismiss(animated: true)
-    }
   }
 
   @objc(requestBillingAgreement:withResolver:withRejecter:)
