@@ -1,7 +1,6 @@
 import {
   withAndroidManifest,
   withAndroidStyles,
-  withProjectBuildGradle,
   AndroidConfig,
   type ConfigPlugin,
 } from '@expo/config-plugins';
@@ -17,13 +16,6 @@ export const withExpoBraintreeAndroid: ConfigPlugin = (expoConfig) => {
 
   expoConfig = withAndroidStyles(expoConfig, (config) => {
     config.modResults = addBraintreeTransparentTheme(config.modResults);
-    return config;
-  });
-
-  expoConfig = withProjectBuildGradle(expoConfig, (config) => {
-    config.modResults.contents = addCardinalRepository(
-      config.modResults.contents
-    );
     return config;
   });
 
@@ -174,30 +166,4 @@ const addBraintreeTransparentTheme = (
   });
 
   return styles;
-};
-
-// Add Cardinal Commerce repository for 3D Secure
-const addCardinalRepository = (buildGradle: string): string => {
-  // Check if Cardinal repository already exists
-  if (buildGradle.includes('cardinalcommerceprod.jfrog.io')) {
-    console.log(
-      'withExpoBraintreeAndroid: Cardinal Commerce repository already exists'
-    );
-    return buildGradle;
-  }
-
-  // Add Cardinal repository to allprojects > repositories
-  const cardinalRepo = `
-        maven {
-            url "https://cardinalcommerceprod.jfrog.io/artifactory/android"
-            credentials {
-                username 'braintree_team_sdk'
-                password 'AKCp8jQcoDy2hxSWhDAUQKXLDPDx6NYRkqrgFLRc3qDrayg6rrCbJpsKKyMwaykVL8FWusJpp'
-            }
-        }`;
-
-  return buildGradle.replace(
-    /(allprojects\s*\{[^}]*repositories\s*\{)/,
-    `$1${cardinalRepo}`
-  );
 };
