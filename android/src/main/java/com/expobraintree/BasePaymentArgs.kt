@@ -22,7 +22,9 @@ sealed class PaymentMethod : Parcelable {
         val expirationYear: String,
         val cvv: String?,
         val postalCode: String?,
-        val use3DSecure: Boolean
+        val use3DSecure: Boolean,
+        val amount: String = "0",
+        val currency: String = ""
     ) : PaymentMethod()
 
     @Parcelize

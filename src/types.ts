@@ -65,6 +65,9 @@ export type TokenizeCardOptions = {
   cvv: string;
   postalCode?: string;
   clientToken: string;
+  amount?: string;
+  currency?: string;
+  use3DSecure?: boolean;
 };
 
 export type BTPayPalAccountNonceAddressResult = {

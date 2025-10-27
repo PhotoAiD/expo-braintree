@@ -32,6 +32,17 @@ class CardPaymentExecutor(
             context = context,
             authorization = args.clientToken
         )
+
+        // Initialize 3DS client and launcher early if 3DS is enabled
+        val paymentMethod = args.paymentMethod as? PaymentMethod.Card
+        if (paymentMethod?.use3DSecure == true && context is FragmentActivity) {
+            Log.d(TAG, "[init] Initializing 3DS client and launcher early")
+            threeDSecureClient = ThreeDSecureClient(
+                context = context,
+                authorization = args.clientToken
+            )
+            threeDSecureLauncher = ThreeDSecureLauncher(context, this)
+        }
     }
 
     override fun requestPayment(activity: FragmentActivity) {
@@ -69,7 +80,7 @@ class CardPaymentExecutor(
                     if (paymentMethod.use3DSecure) {
                         Log.d(TAG, "[requestPayment] 3DS enabled, starting verification")
                         currentCardNonce = nonce.string
-                        requestThreeDSecure(activity, nonce.string)
+                        requestThreeDSecure(activity, nonce)
                     } else {
                         Log.d(TAG, "[requestPayment] 3DS not required, returning nonce")
                         handleSuccessWithCardMethod(nonce.string)
@@ -83,21 +94,31 @@ class CardPaymentExecutor(
         }
     }
 
-    private fun requestThreeDSecure(activity: FragmentActivity, nonce: String) {
+    private fun requestThreeDSecure(activity: FragmentActivity, cardNonce: com.braintreepayments.api.card.CardNonce) {
         val paymentMethod = args.paymentMethod as PaymentMethod.Card
-        Log.d(TAG, "[requestThreeDSecure] Initializing 3DS client")
+        Log.d(TAG, "[requestThreeDSecure] Starting 3DS verification")
 
-        threeDSecureClient = ThreeDSecureClient(
-            context = context,
-            authorization = args.clientToken
-        )
-        threeDSecureLauncher = ThreeDSecureLauncher(activity, this)
+        // Ensure 3DS client and launcher are initialized
+        if (threeDSecureClient == null) {
+            Log.d(TAG, "[requestThreeDSecure] Late initialization of 3DS client")
+            threeDSecureClient = ThreeDSecureClient(
+                context = context,
+                authorization = args.clientToken
+            )
+        }
 
-        // Extract amount from payment method - we need to add this to the Card payment method
-        // For now, using "0" as placeholder - this should be passed from RN side
+        if (threeDSecureLauncher == null) {
+            Log.e(TAG, "[requestThreeDSecure] ThreeDSecureLauncher not initialized - this should not happen!")
+            handleError("3D Secure initialization error", "Launcher not initialized early enough")
+            return
+        }
+
+        Log.d(TAG, "[requestThreeDSecure] nonce: ${cardNonce.string}, cardType: ${cardNonce.cardType}")
+        Log.d(TAG, "[requestThreeDSecure] amount: ${paymentMethod.amount}, email: ${args.email}")
+
         val threeDSecureRequest = ThreeDSecureRequest(
-            nonce = nonce,
-            amount = "0", // TODO: This should come from payment args
+            nonce = cardNonce.string,
+            amount = paymentMethod.amount,
             email = args.email
         )
 
@@ -170,8 +191,8 @@ class CardPaymentExecutor(
         val paymentMethod = args.paymentMethod as PaymentMethod.Card
         handleSuccess(
             nonce = nonce,
-            amount = "0", // TODO: This should come from payment args
-            currency = "USD", // TODO: This should come from payment args
+            amount = paymentMethod.amount,
+            currency = if (paymentMethod.currency.isNotEmpty()) paymentMethod.currency else "USD",
             paymentType = "Card"
         )
     }

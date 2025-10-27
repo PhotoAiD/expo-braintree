@@ -187,8 +187,14 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
             val clientToken = data.getString("clientToken") ?: ""
             val deviceData = data.getString("deviceData") ?: ""
             val email = data.getString("email") ?: ""
+            val amount = data.getString("amount") ?: "0"
+            val currency = data.getString("currency") ?: "USD"
+            val use3DSecure = data.getBoolean("use3DSecure")
+
+            Log.d(TAG, "[tokenizeCardData] Parameters - amount: $amount, currency: $currency, use3DSecure: $use3DSecure")
 
             val cardData = data.getMap("card")
+            Log.d(TAG, "[tokenizeCardData] Card data present: ${cardData != null}, has number: ${cardData?.hasKey("number")}")
             val paymentArgs = BasePaymentArgs(
                 clientToken = clientToken,
                 paymentMethod = PaymentMethod.Card(
@@ -197,7 +203,9 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
                     expirationYear = cardData?.getString("expirationYear") ?: "",
                     cvv = cardData?.getString("cvv"),
                     postalCode = cardData?.getString("postalCode"),
-                    use3DSecure = false
+                    use3DSecure = use3DSecure,
+                    amount = amount,
+                    currency = currency
                 ),
                 email = email,
                 deviceData = deviceData
