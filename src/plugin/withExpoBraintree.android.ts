@@ -9,7 +9,11 @@ const { getMainActivityOrThrow, getMainApplication } = AndroidConfig.Manifest;
 
 export const withExpoBraintreeAndroid: ConfigPlugin = (expoConfig) => {
   expoConfig = withAndroidManifest(expoConfig, (config) => {
-    config.modResults = addBraintreePaymentActivity(config.modResults);
+    const packageName = config.android?.package || 'com.example.app';
+    config.modResults = addBraintreePaymentActivity(
+      config.modResults,
+      packageName
+    );
     config.modResults = setMainActivityLaunchMode(config.modResults);
     return config;
   });
@@ -35,7 +39,8 @@ const setMainActivityLaunchMode = (
 
 // Add BraintreePaymentActivity to AndroidManifest
 const addBraintreePaymentActivity = (
-  modResults: AndroidConfig.Manifest.AndroidManifest
+  modResults: AndroidConfig.Manifest.AndroidManifest,
+  packageName: string
 ): AndroidConfig.Manifest.AndroidManifest => {
   const mainApplication = getMainApplication(modResults);
 
@@ -61,9 +66,6 @@ const addBraintreePaymentActivity = (
     );
     return modResults;
   }
-
-  // Get package name for deep link scheme
-  const packageName = modResults.manifest.$.package || 'com.example.app';
 
   // Add BraintreePaymentActivity
   mainApplication.activity.push({
