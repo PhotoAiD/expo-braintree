@@ -16,6 +16,9 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
   private var apiClient: BTAPIClient?
   private var applePayClient: BTApplePayClient?
   private var paymentAuthorizationViewController: PKPaymentAuthorizationViewController?
+  private var didHandleResult = false
+  private var pendingSuccessData: (nonce: String, amount: String, currency: String, additionalData: [String: Any])?
+  private var pendingError: (message: String, localizedMessage: String)?
 
   init(args: BasePaymentArgs, listener: PaymentExecutorListener?) {
     self.args = args
@@ -90,13 +93,15 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
       if let error = error {
         let result = PKPaymentAuthorizationResult(status: .failure, errors: nil)
         completion(result)
-        self.handleError(
+        self.didHandleResult = true
+        self.pendingError = (
           message: ERROR_TYPES.APPLE_PAY_TOKENIZATION_ERROR.rawValue,
           localizedMessage: error.localizedDescription
         )
       } else if let response = response, let nonce = response["nonce"] as? String {
         let result = PKPaymentAuthorizationResult(status: .success, errors: nil)
         completion(result)
+        self.didHandleResult = true
 
         var amount = "0"
         var currency = "USD"
@@ -106,17 +111,13 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
           currency = options["currencyCode"] as? String ?? "USD"
         }
 
-        self.handleSuccess(
-          nonce: nonce,
-          amount: amount,
-          currency: currency,
-          paymentType: "ApplePay",
-          additionalData: response
-        )
+        // Store success data to send after sheet dismisses
+        self.pendingSuccessData = (nonce: nonce, amount: amount, currency: currency, additionalData: response)
       } else {
         let result = PKPaymentAuthorizationResult(status: .failure, errors: nil)
         completion(result)
-        self.handleError(
+        self.didHandleResult = true
+        self.pendingError = (
           message: ERROR_TYPES.APPLE_PAY_TOKENIZATION_ERROR.rawValue,
           localizedMessage: "Failed to tokenize Apple Pay payment"
         )
@@ -125,8 +126,27 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
   }
 
   func paymentAuthorizationViewControllerDidFinish(_ controller: PKPaymentAuthorizationViewController) {
+    // Dismiss the Apple Pay sheet
     controller.dismiss(animated: true) { [weak self] in
-      self?.handleCancel()
+      guard let self = self else { return }
+
+      // Send the result to React Native after the sheet has been dismissed
+      if let successData = self.pendingSuccessData {
+        self.handleSuccess(
+          nonce: successData.nonce,
+          amount: successData.amount,
+          currency: successData.currency,
+          paymentType: "ApplePay",
+          additionalData: successData.additionalData
+        )
+      } else if let error = self.pendingError {
+        self.handleError(
+          message: error.message,
+          localizedMessage: error.localizedMessage
+        )
+      } else if !self.didHandleResult {
+        self.handleCancel()
+      }
     }
   }
 
@@ -137,5 +157,8 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
     apiClient = nil
     applePayClient = nil
     paymentAuthorizationViewController = nil
+    didHandleResult = false
+    pendingSuccessData = nil
+    pendingError = nil
   }
 }
