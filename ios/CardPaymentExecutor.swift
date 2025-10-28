@@ -136,10 +136,16 @@ class CardPaymentExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequestD
 
         self.handleSuccessWithCardNonce(cardNonce: tokenizedCard)
       } else if let error = error {
-        self.handleError(
-          message: ERROR_TYPES.THREE_D_SECURE_AUTHENTICATION_FAILED.rawValue,
-          localizedMessage: error.localizedDescription
-        )
+        if let threeDSecureError = error as? BTThreeDSecureError, threeDSecureError == .canceled {
+          self.handleCancel()
+        } else if (error as NSError).code == BTThreeDSecureError.canceled.errorCode {
+          self.handleCancel()
+        } else {
+          self.handleError(
+            message: ERROR_TYPES.THREE_D_SECURE_AUTHENTICATION_FAILED.rawValue,
+            localizedMessage: error.localizedDescription
+          )
+        }
       } else {
         self.handleError(
           message: ERROR_TYPES.THREE_D_SECURE_VERIFICATION_FAILED.rawValue,
