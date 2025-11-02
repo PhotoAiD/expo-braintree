@@ -229,7 +229,7 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
             val clientToken = data.getString("clientToken") ?: ""
             val deviceData = data.getString("deviceData") ?: ""
             val email = data.getString("email") ?: ""
-            val amount = data.getString("totalPrice") ?: ""
+            val amount = data.getString("amount") ?: ""
             val currency = data.getString("currencyCode") ?: "USD"
 
             val paymentArgs = BasePaymentArgs(
