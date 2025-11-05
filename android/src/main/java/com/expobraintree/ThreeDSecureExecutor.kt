@@ -65,7 +65,7 @@ class ThreeDSecureExecutor(
                     handleSuccess(
                         nonce = paymentAuthRequest.nonce.string,
                         amount = paymentMethod.amount,
-                        currency = "USD", // TODO: This should come from payment args
+                        currency = paymentMethod.currency,
                         paymentType = "Card3DS"
                     )
                 }
@@ -107,7 +107,7 @@ class ThreeDSecureExecutor(
                     handleSuccess(
                         nonce = threeDSecureNonce.string,
                         amount = paymentMethod.amount,
-                        currency = "USD", // TODO: This should come from payment args
+                        currency = paymentMethod.currency,
                         paymentType = "Card3DS"
                     )
                 }

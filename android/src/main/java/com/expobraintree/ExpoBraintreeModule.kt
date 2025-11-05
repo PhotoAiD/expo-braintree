@@ -263,13 +263,15 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
             val email = data.getString("email") ?: ""
             val nonce = data.getString("nonce") ?: ""
             val amount = data.getString("amount") ?: ""
+            val currency = data.getString("currencyCode") ?: ""
 
             val paymentArgs = BasePaymentArgs(
                 clientToken = clientToken,
                 paymentMethod = PaymentMethod.ThreeDSecure(
                     nonce = nonce,
                     amount = amount,
-                    email = email
+                    email = email,
+                    currency = currency
                 ),
                 email = email,
                 deviceData = deviceData

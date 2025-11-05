@@ -7,12 +7,24 @@ import {
 
 const { getMainActivityOrThrow, getMainApplication } = AndroidConfig.Manifest;
 
-export const withExpoBraintreeAndroid: ConfigPlugin = (expoConfig) => {
+export type ExpoBraintreePluginProps = {
+  /**
+   * Custom domain for deep linking (default: 'photoaid.com')
+   * This is used for PayPal return URL deep linking
+   */
+  androidDeepLinkDomain?: string;
+};
+
+export const withExpoBraintreeAndroid: ConfigPlugin<
+  ExpoBraintreePluginProps | void
+> = (expoConfig, props) => {
+  const domain = props?.androidDeepLinkDomain || 'photoaid.com';
   expoConfig = withAndroidManifest(expoConfig, (config) => {
     const packageName = config.android?.package || 'com.example.app';
     config.modResults = addBraintreePaymentActivity(
       config.modResults,
-      packageName
+      packageName,
+      domain
     );
     config.modResults = setMainActivityLaunchMode(config.modResults);
     return config;
@@ -40,7 +52,8 @@ const setMainActivityLaunchMode = (
 // Add BraintreePaymentActivity to AndroidManifest
 const addBraintreePaymentActivity = (
   modResults: AndroidConfig.Manifest.AndroidManifest,
-  packageName: string
+  packageName: string,
+  domain: string
 ): AndroidConfig.Manifest.AndroidManifest => {
   const mainApplication = getMainApplication(modResults);
 
@@ -97,7 +110,7 @@ const addBraintreePaymentActivity = (
           {
             $: {
               'android:scheme': 'https',
-              'android:host': 'photoaid.com',
+              'android:host': domain,
               'android:pathPrefix': '/braintree/return',
             },
           },

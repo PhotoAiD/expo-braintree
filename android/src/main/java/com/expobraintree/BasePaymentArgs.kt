@@ -38,7 +38,8 @@ sealed class PaymentMethod : Parcelable {
     data class ThreeDSecure(
         val nonce: String,
         val amount: String,
-        val email: String
+        val email: String,
+        val currency: String = ""
     ) : PaymentMethod()
 }
 

@@ -103,6 +103,9 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
         completion(result)
         self.didHandleResult = true
 
+        // Default to "0" for amount - this is intentional as the JavaScript interface
+        // allows nil values, and falling back to "0" will trigger a clear validation error
+        // in the success callback rather than silently failing
         var amount = "0"
         var currency = "USD"
 

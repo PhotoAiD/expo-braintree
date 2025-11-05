@@ -80,11 +80,12 @@ class ThreeDSecureExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequest
         }
 
         let additionalData = prepareThreeDSecureNonceResult(nonce: threeDSecureResult) as? [String: Any]
+        let currency = options["currencyCode"] as? String ?? ""
 
         self.handleSuccess(
           nonce: tokenizedCard.nonce,
           amount: amount,
-          currency: "USD",
+          currency: currency,
           paymentType: "Card3DS",
           additionalData: additionalData
         )

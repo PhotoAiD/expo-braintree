@@ -1,5 +1,8 @@
 import { createRunOncePlugin, type ConfigPlugin } from '@expo/config-plugins';
-import { withExpoBraintreeAndroid } from './withExpoBraintree.android';
+import {
+  withExpoBraintreeAndroid,
+  type ExpoBraintreePluginProps as AndroidPluginProps,
+} from './withExpoBraintree.android';
 import {
   withExpoBraintreeAppDelegate,
   withExpoBraintreePlist,
@@ -28,14 +31,14 @@ export type ExpoBraintreePluginProps = {
    * xCode project name, used for importing the swift expo braintree config header
    */
   xCodeProjectAppName: string;
-};
+} & AndroidPluginProps;
 
 export const withExpoBraintreePlugin: ConfigPlugin<ExpoBraintreePluginProps> = (
   config,
   props
 ) => {
   // Android mods
-  config = withExpoBraintreeAndroid(config);
+  config = withExpoBraintreeAndroid(config, props);
   // IOS mods
   config = withSwiftBraintreeWrapperFile(config);
   config = withExpoBraintreeAppDelegate(config, props);

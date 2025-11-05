@@ -1,27 +1,3 @@
-export enum EXCEPTION_TYPES {
-  SWIFT_EXCEPTION = 'ExpoBraintree:`SwiftException',
-  USER_CANCEL_EXCEPTION = 'ExpoBraintree:`UserCancelException',
-  PAYPAL_DISABLED_IN_CONFIGURATION = 'ExpoBraintree:`Paypal disabled in configuration',
-  TOKENIZE_EXCEPTION = 'ExpoBraintree:`TokenizeException',
-}
-
-export enum ERROR_TYPES {
-  API_CLIENT_INITIALIZATION_ERROR = 'API_CLIENT_INITIALIZATION_ERROR',
-  TOKENIZE_VAULT_PAYMENT_ERROR = 'TOKENIZE_VAULT_PAYMENT_ERROR',
-  USER_CANCEL_TRANSACTION_ERROR = 'USER_CANCEL_TRANSACTION_ERROR',
-  PAYPAL_DISABLED_IN_CONFIGURATION_ERROR = 'PAYPAL_DISABLED_IN_CONFIGURATION_ERROR',
-  DATA_COLLECTOR_ERROR = 'DATA_COLLECTOR_ERROR',
-  CARD_TOKENIZATION_ERROR = 'CARD_TOKENIZATION_ERROR',
-  APPLE_PAY_NOT_AVAILABLE = 'APPLE_PAY_NOT_AVAILABLE',
-  APPLE_PAY_TOKENIZATION_ERROR = 'APPLE_PAY_TOKENIZATION_ERROR',
-  GOOGLE_PAY_NOT_AVAILABLE = 'GOOGLE_PAY_NOT_AVAILABLE',
-  GOOGLE_PAY_TOKENIZATION_ERROR = 'GOOGLE_PAY_TOKENIZATION_ERROR',
-  THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY = 'THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY',
-  THREE_D_SECURE_LIABILITY_NOT_SHIFTED = 'THREE_D_SECURE_LIABILITY_NOT_SHIFTED',
-  THREE_D_SECURE_VERIFICATION_FAILED = 'THREE_D_SECURE_VERIFICATION_FAILED',
-  THREE_D_SECURE_AUTHENTICATION_FAILED = 'THREE_D_SECURE_AUTHENTICATION_FAILED',
-}
-
 export enum BTPayPalCheckoutIntent {
   authorize = 'authorize',
   order = 'order',
@@ -102,9 +78,9 @@ export type BTCardTokenizationNonceResult = {
 export type BTPayPalGetDeviceDataResult = string;
 
 export type BTPayPalError = {
-  code?: EXCEPTION_TYPES;
-  message?: ERROR_TYPES | string;
-  domain?: ERROR_TYPES;
+  code?: string;
+  message?: string;
+  domain?: string;
 };
 
 // Apple Pay Types
@@ -214,6 +190,7 @@ export type ThreeDSecureRequestOptions = {
   amount: string;
   nonce: string;
   email?: string;
+  currencyCode?: string;
   billingAddress?: ThreeDSecurePostalAddress;
   additionalInformation?: ThreeDSecureAdditionalInformation;
   versionRequested?: '1' | '2';

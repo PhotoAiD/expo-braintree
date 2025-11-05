@@ -113,8 +113,7 @@ class CardPaymentExecutor(
             return
         }
 
-        Log.d(TAG, "[requestThreeDSecure] nonce: ${cardNonce.string}, cardType: ${cardNonce.cardType}")
-        Log.d(TAG, "[requestThreeDSecure] amount: ${paymentMethod.amount}, email: ${args.email}")
+        Log.d(TAG, "[requestThreeDSecure] cardType: ${cardNonce.cardType}, amount: ${paymentMethod.amount}")
 
         val threeDSecureRequest = ThreeDSecureRequest(
             nonce = cardNonce.string,
