@@ -1,8 +1,8 @@
 //
-//  BTPayPalVaultRequest.swift
+//  ExpoBraintreeRefactored.swift
 //  expo-braintree
 //
-//  Created by Maciej Sasinowski on 28/04/2024.
+//  Refactored version using executor pattern
 //
 
 import Braintree
@@ -10,172 +10,75 @@ import Foundation
 import PassKit
 import React
 
-enum EXCEPTION_TYPES: String {
-  case SWIFT_EXCEPTION = "ReactNativeExpoBraintree:`SwiftException"
-  case USER_CANCEL_EXCEPTION = "ReactNativeExpoBraintree:`UserCancelException"
-  case TOKENIZE_EXCEPTION = "ReactNativeExpoBraintree:`TokenizeException"
-  case PAYPAL_DISABLED_IN_CONFIGURATION =
-    "ReactNativeExpoBraintree:`Paypal disabled in configuration"
-}
-
-enum ERROR_TYPES: String {
-  case API_CLIENT_INITIALIZATION_ERROR = "API_CLIENT_INITIALIZATION_ERROR"
-  case TOKENIZE_VAULT_PAYMENT_ERROR = "TOKENIZE_VAULT_PAYMENT_ERROR"
-  case USER_CANCEL_TRANSACTION_ERROR = "USER_CANCEL_TRANSACTION_ERROR"
-  case PAYPAL_DISABLED_IN_CONFIGURATION_ERROR = "PAYPAL_DISABLED_IN_CONFIGURATION_ERROR"
-  case DATA_COLLECTOR_ERROR = "DATA_COLLECTOR_ERROR"
-  case CARD_TOKENIZATION_ERROR = "CARD_TOKENIZATION_ERROR"
-  case APPLE_PAY_NOT_AVAILABLE = "APPLE_PAY_NOT_AVAILABLE"
-  case APPLE_PAY_TOKENIZATION_ERROR = "APPLE_PAY_TOKENIZATION_ERROR"
-}
-
 @objc(ExpoBraintree)
-class ExpoBraintree: NSObject {
+class ExpoBraintree: NSObject, PaymentExecutorListener {
+  private var currentExecutor: BasePaymentExecutor?
+  private var currentResolve: RCTPromiseResolveBlock?
+  private var currentReject: RCTPromiseRejectBlock?
 
   @objc(requestBillingAgreement:withResolver:withRejecter:)
   func requestBillingAgreement(
-    options: [String: String], resolve: @escaping RCTPromiseResolveBlock,
+    options: [String: Any],
+    resolve: @escaping RCTPromiseResolveBlock,
     reject: @escaping RCTPromiseRejectBlock
   ) {
-    let clientToken = options["clientToken"] ?? ""
-    // Step 1: Initialize Braintree API Client
-    let apiClientOptional = BTAPIClient(authorization: clientToken)
-    guard let apiClient = apiClientOptional else {
-      return reject(
-        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-        ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue,
-        NSError(domain: ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue, code: -1))
-    }
-    // Step 2: Initialize BPayPal API Client
-    let payPalClient = BTPayPalClient(apiClient: apiClient)
-    let vaultRequest = prepareBTPayPalVaultRequest(options: options)
-    payPalClient.tokenize(vaultRequest) {
-      (accountNonce, error) -> Void in
-      if let accountNonce = accountNonce {
-        // Step 3: Handle Success: Paypal Nonce Created resolved
-        return resolve(
-          prepareBTPayPalAccountNonceResult(
-            accountNonce: accountNonce
-          ))
-      } else if let error = error as? BTPayPalError {
-        // Step 3: Handle Error: Tokenize error
-        switch error.errorCode {
-        case BTPayPalError.disabled.errorCode:
-          return reject(
-            EXCEPTION_TYPES.PAYPAL_DISABLED_IN_CONFIGURATION.rawValue,
-            ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.rawValue,
-            NSError(
-              domain: ERROR_TYPES.PAYPAL_DISABLED_IN_CONFIGURATION_ERROR.rawValue,
-              code: BTPayPalError.disabled.errorCode)
-          )
-        case BTPayPalError.canceled.errorCode:
-          return reject(
-            EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.rawValue,
-            ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.rawValue,
-            NSError(
-              domain: ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.rawValue,
-              code: BTPayPalError.canceled.errorCode)
-          )
-        default:
-          return reject(
-            EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-            ERROR_TYPES.TOKENIZE_VAULT_PAYMENT_ERROR.rawValue,
-            NSError(
-              domain: error.localizedDescription,
-              code: -1
-            )
-          )
-        }
-      }
-    }
+    let clientToken = options["clientToken"] as? String ?? ""
+    let billingAgreementDescription = options["billingAgreementDescription"] as? String
+
+    let args = BasePaymentArgs(
+      clientToken: clientToken,
+      paymentMethod: .payPalVault(billingAgreementDescription: billingAgreementDescription),
+      email: options["email"] as? String ?? "",
+      deviceData: options["deviceData"] as? String ?? ""
+    )
+
+    executePayment(args: args, resolve: resolve, reject: reject)
   }
 
   @objc(requestOneTimePayment:withResolver:withRejecter:)
   func requestOneTimePayment(
-    options: [String: String], resolve: @escaping RCTPromiseResolveBlock,
+    options: [String: Any],
+    resolve: @escaping RCTPromiseResolveBlock,
     reject: @escaping RCTPromiseRejectBlock
   ) {
-    let clientToken = options["clientToken"] ?? ""
-    // Step 1: Initialize Braintree API Client
-    let apiClientOptional = BTAPIClient(authorization: clientToken)
-    guard let apiClient = apiClientOptional else {
-      return reject(
-        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-        ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue,
-        NSError(domain: ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue, code: -1))
-    }
-    // Step 2: Initialize BPayPal API Client
-    let payPalClient = BTPayPalClient(apiClient: apiClient)
-    let checkoutRequest = prepareBTPayPalCheckoutRequest(options: options)
-    payPalClient.tokenize(checkoutRequest) {
-      (accountNonce, error) -> Void in
-      if let accountNonce = accountNonce {
-        // Step 3: Handle Success: Paypal Nonce Created resolved
-        return resolve(
-          prepareBTPayPalAccountNonceResult(
-            accountNonce: accountNonce
-          ))
-      } else if let error = error as? BTPayPalError {
-        // Step 3: Handle Error: Tokenize error
-        switch error.errorCode {
-        case BTPayPalError.disabled.errorCode:
-          return reject(
-            EXCEPTION_TYPES.PAYPAL_DISABLED_IN_CONFIGURATION.rawValue,
-            ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.rawValue,
-            NSError(
-              domain: ERROR_TYPES.PAYPAL_DISABLED_IN_CONFIGURATION_ERROR.rawValue,
-              code: BTPayPalError.disabled.errorCode)
-          )
-        case BTPayPalError.canceled.errorCode:
-          return reject(
-            EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.rawValue,
-            ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.rawValue,
-            NSError(
-              domain: ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.rawValue,
-              code: BTPayPalError.canceled.errorCode)
-          )
-        default:
-          return reject(
-            EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-            ERROR_TYPES.TOKENIZE_VAULT_PAYMENT_ERROR.rawValue,
-            NSError(
-              domain: error.localizedDescription,
-              code: -1
-            )
-          )
-        }
-      }
-    }
+    let clientToken = options["clientToken"] as? String ?? ""
+    let amount = options["amount"] as? String ?? ""
+    let currency = options["currencyCode"] as? String ?? "USD"
+
+    let args = BasePaymentArgs(
+      clientToken: clientToken,
+      paymentMethod: .payPalCheckout(amount: amount, currency: currency),
+      email: options["email"] as? String ?? "",
+      deviceData: options["deviceData"] as? String ?? ""
+    )
+
+    executePayment(args: args, resolve: resolve, reject: reject)
   }
 
   @objc(getDeviceDataFromDataCollector:withResolver:withRejecter:)
   func getDeviceDataFromDataCollector(
-    clientToken: String, resolve: @escaping RCTPromiseResolveBlock,
+    clientToken: String,
+    resolve: @escaping RCTPromiseResolveBlock,
     reject: @escaping RCTPromiseRejectBlock
   ) {
-    // Step 1: Initialize Braintree API Client
-    let apiClientOptional = BTAPIClient(authorization: clientToken)
-    guard let apiClient = apiClientOptional else {
+    guard let apiClient = BTAPIClient(authorization: clientToken) else {
       return reject(
         EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
         ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue,
-        NSError(domain: ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue, code: -1))
+        NSError(domain: ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue, code: -1)
+      )
     }
-    // Step 2: Initialize DataCollerctor
+
     let dataCollector = BTDataCollector(apiClient: apiClient)
-    // Step 3: Try To Collect Device Data and make a corelation Id if that is possible
-    dataCollector.collectDeviceData { corelationId, dataCollectorError in
-      if let corelationId = corelationId {
-        // Step 4: Return corelation id
-        return resolve(corelationId)
-      } else if let dataCollectorError = dataCollectorError {
-        // Step 4: Handle Error: DataCollector error
+
+    dataCollector.collectDeviceData { correlationId, dataCollectorError in
+      if let correlationId = correlationId {
+        return resolve(correlationId)
+      } else {
         return reject(
           EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
           ERROR_TYPES.DATA_COLLECTOR_ERROR.rawValue,
-          NSError(
-            domain: ERROR_TYPES.DATA_COLLECTOR_ERROR.rawValue,
-            code: -1)
+          NSError(domain: ERROR_TYPES.DATA_COLLECTOR_ERROR.rawValue, code: -1)
         )
       }
     }
@@ -183,41 +86,39 @@ class ExpoBraintree: NSObject {
 
   @objc(tokenizeCardData:withResolver:withRejecter:)
   func tokenizeCardData(
-    options: [String: String], resolve: @escaping RCTPromiseResolveBlock,
+    options: [String: Any],
+    resolve: @escaping RCTPromiseResolveBlock,
     reject: @escaping RCTPromiseRejectBlock
   ) {
-    let clientToken = options["clientToken"] ?? ""
-    // Step 1: Initialize Braintree API Client
-    let apiClientOptional = BTAPIClient(authorization: clientToken)
-    guard let apiClient = apiClientOptional else {
-      return reject(
-        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-        ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue,
-        NSError(domain: ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue, code: -1))
-    }
-    // Step 2: Initialize DataCollerctor
-    let cardClient = BTCardClient(apiClient: apiClient)
-    let card = prepareCardData(options: options)
-    // Step 3: Try To Collect Device Data and make a corelation Id if that is possible
-    cardClient.tokenize(card) {
-      (cardNonce, error) -> Void in
-      if let cardNonce = cardNonce {
-        // Step 4: Return corelation id
-        return resolve(prepareBTCardNonceResult(cardNonce: cardNonce))
-      } else if let error = error {
-        // Step 4: Handle Error: DataCollector error
-        return reject(
-          EXCEPTION_TYPES.TOKENIZE_EXCEPTION.rawValue,
-          ERROR_TYPES.CARD_TOKENIZATION_ERROR.rawValue,
-          NSError(
-            domain: ERROR_TYPES.CARD_TOKENIZATION_ERROR.rawValue,
-            code: -1)
-        )
-      }
-    }
-  }
+    let clientToken = options["clientToken"] as? String ?? ""
+    let cardData = options["card"] as? [String: Any] ?? [:]
+    let cardNumber = cardData["number"] as? String ?? ""
+    let expirationMonth = cardData["expirationMonth"] as? String ?? ""
+    let expirationYear = cardData["expirationYear"] as? String ?? ""
+    let cvv = cardData["cvv"] as? String
+    let postalCode = cardData["postalCode"] as? String
+    let use3DSecure = options["use3DSecure"] as? Bool ?? false
+    let amount = options["amount"] as? String ?? "0"
+    let currency = options["currency"] as? String ?? "USD"
 
-  // MARK: - Apple Pay Methods
+    let args = BasePaymentArgs(
+      clientToken: clientToken,
+      paymentMethod: .card(
+        cardNumber: cardNumber,
+        expirationMonth: expirationMonth,
+        expirationYear: expirationYear,
+        cvv: cvv,
+        postalCode: postalCode,
+        use3DSecure: use3DSecure,
+        amount: amount,
+        currency: currency
+      ),
+      email: options["email"] as? String ?? "",
+      deviceData: options["deviceData"] as? String ?? ""
+    )
+
+    executePayment(args: args, resolve: resolve, reject: reject)
+  }
 
   @objc(isApplePayAvailable:withRejecter:)
   func isApplePayAvailable(
@@ -264,7 +165,6 @@ class ExpoBraintree: NSObject {
     resolve: @escaping RCTPromiseResolveBlock,
     reject: @escaping RCTPromiseRejectBlock
   ) {
-    // Check if Apple Pay is available
     guard BTApplePayHelper.isApplePayAvailable() else {
       return reject(
         EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
@@ -273,157 +173,110 @@ class ExpoBraintree: NSObject {
       )
     }
 
-    // Store the client token for later use
-    self.applePayClientToken = options["clientToken"] as? String
+    let clientToken = options["clientToken"] as? String ?? ""
 
-    // Prepare payment request
-    let paymentRequest = BTApplePayHelper.preparePaymentRequest(options: options)
+    let args = BasePaymentArgs(
+      clientToken: clientToken,
+      paymentMethod: .applePay(options: options),
+      email: options["email"] as? String ?? "",
+      deviceData: options["deviceData"] as? String ?? ""
+    )
 
-    // Create payment authorization view controller
-    guard let paymentAuthorizationViewController = PKPaymentAuthorizationViewController(paymentRequest: paymentRequest) else {
-      return reject(
-        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-        ERROR_TYPES.APPLE_PAY_NOT_AVAILABLE.rawValue,
-        NSError(domain: ERROR_TYPES.APPLE_PAY_NOT_AVAILABLE.rawValue, code: -1)
-      )
-    }
-
-    // Store the promise callbacks to use them in the delegate methods
-    self.applePayResolve = resolve
-    self.applePayReject = reject
-
-    paymentAuthorizationViewController.delegate = self
-
-    // Present the payment sheet
-    DispatchQueue.main.async {
-      if let rootViewController = UIApplication.shared.delegate?.window??.rootViewController {
-        rootViewController.present(paymentAuthorizationViewController, animated: true, completion: nil)
-      } else {
-        reject(
-          EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-          "NO_ROOT_VIEW_CONTROLLER",
-          NSError(domain: "NO_ROOT_VIEW_CONTROLLER", code: -1)
-        )
-      }
-    }
+    executePayment(args: args, resolve: resolve, reject: reject)
   }
 
-  @objc(tokenizeApplePayPayment:withResolver:withRejecter:)
-  func tokenizeApplePayPayment(
+  @objc(verifyThreeDSecure:withResolver:withRejecter:)
+  func verifyThreeDSecure(
     options: [String: Any],
     resolve: @escaping RCTPromiseResolveBlock,
     reject: @escaping RCTPromiseRejectBlock
   ) {
     let clientToken = options["clientToken"] as? String ?? ""
+    let nonce = options["nonce"] as? String ?? ""
+    let amount = options["amount"] as? String ?? ""
 
-    // Step 1: Initialize Braintree API Client
-    let apiClientOptional = BTAPIClient(authorization: clientToken)
-    guard let apiClient = apiClientOptional else {
-      return reject(
-        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-        ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue,
-        NSError(domain: ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue, code: -1)
-      )
-    }
-
-    // This method would be called after receiving PKPayment from Apple Pay sheet
-    // For now, we'll return an error since we can't directly tokenize without PKPayment
-    reject(
-      EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-      "DIRECT_TOKENIZATION_NOT_SUPPORTED",
-      NSError(domain: "Use presentApplePaymentSheet instead", code: -1)
+    let args = BasePaymentArgs(
+      clientToken: clientToken,
+      paymentMethod: .threeDSecure(nonce: nonce, amount: amount, options: options),
+      email: options["email"] as? String ?? "",
+      deviceData: options["deviceData"] as? String ?? ""
     )
+
+    executePayment(args: args, resolve: resolve, reject: reject)
   }
 
-  // Properties to store promise callbacks for Apple Pay
-  private var applePayResolve: RCTPromiseResolveBlock?
-  private var applePayReject: RCTPromiseRejectBlock?
-  private var applePayClientToken: String?
-
-}
-
-// MARK: - PKPaymentAuthorizationViewControllerDelegate
-
-extension ExpoBraintree: PKPaymentAuthorizationViewControllerDelegate {
-
-  func paymentAuthorizationViewController(
-    _ controller: PKPaymentAuthorizationViewController,
-    didAuthorizePayment payment: PKPayment,
-    handler completion: @escaping (PKPaymentAuthorizationResult) -> Void
+  private func executePayment(
+    args: BasePaymentArgs,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
   ) {
-    // Get the client token from stored options or use a method to retrieve it
-    guard let clientToken = self.applePayClientToken else {
-      let result = PKPaymentAuthorizationResult(status: .failure, errors: nil)
-      completion(result)
-      self.applePayReject?(
-        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-        ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue,
-        NSError(domain: ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue, code: -1)
-      )
-      return
+    currentResolve = resolve
+    currentReject = reject
+
+    let executor: BasePaymentExecutor
+
+    switch args.paymentMethod {
+    case .payPalVault:
+      executor = PayPalPaymentExecutor(args: args, listener: self, isVault: true)
+    case .payPalCheckout:
+      executor = PayPalPaymentExecutor(args: args, listener: self, isVault: false)
+    case .card:
+      executor = CardPaymentExecutor(args: args, listener: self)
+    case .applePay:
+      executor = ApplePayPaymentExecutor(args: args, listener: self)
+    case .threeDSecure:
+      executor = ThreeDSecureExecutor(args: args, listener: self)
     }
 
-    let apiClientOptional = BTAPIClient(authorization: clientToken)
-    guard let apiClient = apiClientOptional else {
-      let result = PKPaymentAuthorizationResult(status: .failure, errors: nil)
-      completion(result)
-      self.applePayReject?(
-        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-        ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue,
-        NSError(domain: ERROR_TYPES.API_CLIENT_INITIALIZATION_ERROR.rawValue, code: -1)
-      )
-      return
-    }
+    currentExecutor = executor
 
-    BTApplePayHelper.tokenizeApplePayment(apiClient: apiClient, payment: payment) { [weak self] (response, error) in
-      if let error = error {
-        let result = PKPaymentAuthorizationResult(status: .failure, errors: nil)
-        completion(result)
-        self?.applePayReject?(
+    DispatchQueue.main.async {
+      guard let rootViewController = UIApplication.shared.delegate?.window??.rootViewController else {
+        reject(
           EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-          ERROR_TYPES.APPLE_PAY_TOKENIZATION_ERROR.rawValue,
-          error
+          "NO_ROOT_VIEW_CONTROLLER",
+          NSError(domain: "NO_ROOT_VIEW_CONTROLLER", code: -1)
         )
-        // Clear callbacks immediately after use
-        self?.applePayResolve = nil
-        self?.applePayReject = nil
-      } else if let response = response {
-        let result = PKPaymentAuthorizationResult(status: .success, errors: nil)
-        completion(result)
-        self?.applePayResolve?(response)
-        // Clear callbacks immediately after use
-        self?.applePayResolve = nil
-        self?.applePayReject = nil
+        return
+      }
+
+      executor.requestPayment(viewController: rootViewController)
+    }
+  }
+
+  func onPaymentResult(_ result: PaymentResultModel) {
+    defer {
+      currentExecutor?.onDestroy()
+      currentExecutor = nil
+      currentResolve = nil
+      currentReject = nil
+    }
+
+    switch result {
+    case .success(let successResult):
+      if successResult.paymentType == "Card", let cardData = successResult.additionalData {
+        currentResolve?(cardData as NSDictionary)
       } else {
-        let result = PKPaymentAuthorizationResult(status: .failure, errors: nil)
-        completion(result)
-        self?.applePayReject?(
-          EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
-          ERROR_TYPES.APPLE_PAY_TOKENIZATION_ERROR.rawValue,
-          NSError(domain: ERROR_TYPES.APPLE_PAY_TOKENIZATION_ERROR.rawValue, code: -1)
-        )
-        // Clear callbacks immediately after use
-        self?.applePayResolve = nil
-        self?.applePayReject = nil
+        currentResolve?(successResult.toNSDictionary())
       }
+
+    case .error(let errorResult):
+      currentReject?(
+        EXCEPTION_TYPES.SWIFT_EXCEPTION.rawValue,
+        errorResult.message ?? "Unknown error",
+        NSError(
+          domain: errorResult.message ?? "Unknown error",
+          code: -1,
+          userInfo: [NSLocalizedDescriptionKey: errorResult.localizedMessage ?? ""]
+        )
+      )
+
+    case .cancel:
+      currentReject?(
+        EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.rawValue,
+        ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.rawValue,
+        NSError(domain: ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.rawValue, code: -1)
+      )
     }
   }
-
-  func paymentAuthorizationViewControllerDidFinish(_ controller: PKPaymentAuthorizationViewController) {
-    controller.dismiss(animated: true) {
-      // If we haven't resolved yet, it means the user cancelled
-      if self.applePayResolve != nil {
-        self.applePayReject?(
-          EXCEPTION_TYPES.USER_CANCEL_EXCEPTION.rawValue,
-          ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.rawValue,
-          NSError(domain: ERROR_TYPES.USER_CANCEL_TRANSACTION_ERROR.rawValue, code: -1)
-        )
-      }
-      // Clear the callbacks
-      self.applePayResolve = nil
-      self.applePayReject = nil
-      self.applePayClientToken = nil
-    }
-  }
-
 }

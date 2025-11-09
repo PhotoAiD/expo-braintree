@@ -1,23 +1,3 @@
-export enum EXCEPTION_TYPES {
-  SWIFT_EXCEPTION = 'ExpoBraintree:`SwiftException',
-  USER_CANCEL_EXCEPTION = 'ExpoBraintree:`UserCancelException',
-  PAYPAL_DISABLED_IN_CONFIGURATION = 'ExpoBraintree:`Paypal disabled in configuration',
-  TOKENIZE_EXCEPTION = 'ExpoBraintree:`TokenizeException',
-}
-
-export enum ERROR_TYPES {
-  API_CLIENT_INITIALIZATION_ERROR = 'API_CLIENT_INITIALIZATION_ERROR',
-  TOKENIZE_VAULT_PAYMENT_ERROR = 'TOKENIZE_VAULT_PAYMENT_ERROR',
-  USER_CANCEL_TRANSACTION_ERROR = 'USER_CANCEL_TRANSACTION_ERROR',
-  PAYPAL_DISABLED_IN_CONFIGURATION_ERROR = 'PAYPAL_DISABLED_IN_CONFIGURATION_ERROR',
-  DATA_COLLECTOR_ERROR = 'DATA_COLLECTOR_ERROR',
-  CARD_TOKENIZATION_ERROR = 'CARD_TOKENIZATION_ERROR',
-  APPLE_PAY_NOT_AVAILABLE = 'APPLE_PAY_NOT_AVAILABLE',
-  APPLE_PAY_TOKENIZATION_ERROR = 'APPLE_PAY_TOKENIZATION_ERROR',
-  GOOGLE_PAY_NOT_AVAILABLE = 'GOOGLE_PAY_NOT_AVAILABLE',
-  GOOGLE_PAY_TOKENIZATION_ERROR = 'GOOGLE_PAY_TOKENIZATION_ERROR',
-}
-
 export enum BTPayPalCheckoutIntent {
   authorize = 'authorize',
   order = 'order',
@@ -61,6 +41,9 @@ export type TokenizeCardOptions = {
   cvv: string;
   postalCode?: string;
   clientToken: string;
+  amount?: string;
+  currency?: string;
+  use3DSecure?: boolean;
 };
 
 export type BTPayPalAccountNonceAddressResult = {
@@ -95,9 +78,9 @@ export type BTCardTokenizationNonceResult = {
 export type BTPayPalGetDeviceDataResult = string;
 
 export type BTPayPalError = {
-  code?: EXCEPTION_TYPES;
-  message?: ERROR_TYPES | string;
-  domain?: ERROR_TYPES;
+  code?: string;
+  message?: string;
+  domain?: string;
 };
 
 // Apple Pay Types
@@ -180,4 +163,58 @@ export type GooglePayNonceResult = {
   email?: string;
   shippingAddress?: BTPayPalAccountNonceAddressResult;
   billingAddress?: BTPayPalAccountNonceAddressResult;
+};
+
+// 3D Secure Types
+export type ThreeDSecurePostalAddress = {
+  givenName?: string;
+  surname?: string;
+  phoneNumber?: string;
+  streetAddress?: string;
+  extendedAddress?: string;
+  locality?: string;
+  region?: string;
+  postalCode?: string;
+  countryCodeAlpha2?: string;
+};
+
+export type ThreeDSecureAdditionalInformation = {
+  shippingGivenName?: string;
+  shippingSurname?: string;
+  shippingPhone?: string;
+  shippingAddress?: ThreeDSecurePostalAddress;
+};
+
+export type ThreeDSecureRequestOptions = {
+  clientToken: string;
+  amount: string;
+  nonce: string;
+  email?: string;
+  currencyCode?: string;
+  billingAddress?: ThreeDSecurePostalAddress;
+  additionalInformation?: ThreeDSecureAdditionalInformation;
+  versionRequested?: '1' | '2';
+  accountType?: 'credit' | 'debit';
+  challengeRequested?: boolean;
+  exemptionRequested?: boolean;
+  mobilePhoneNumber?: string;
+  cardAddChallenge?: 'requested' | 'not_requested';
+};
+
+export type ThreeDSecureInfo = {
+  liabilityShifted: boolean;
+  liabilityShiftPossible: boolean;
+  wasVerified: boolean;
+};
+
+export type ThreeDSecureNonceResult = {
+  nonce: string;
+  threeDSecureInfo: ThreeDSecureInfo;
+  cardNetwork?: string;
+  lastTwo?: string;
+  lastFour?: string;
+  expirationMonth?: string;
+  expirationYear?: string;
+  bin?: string;
+  cardType?: string;
 };

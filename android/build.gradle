@@ -20,6 +20,7 @@ def isNewArchitectureEnabled() {
 
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
+apply plugin: "kotlin-parcelize"
 
 if (isNewArchitectureEnabled()) {
   apply plugin: "com.facebook.react"
@@ -90,9 +91,11 @@ dependencies {
   //noinspection GradleDynamicVersion
   implementation "com.facebook.react:react-native:+"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+  implementation 'androidx.appcompat:appcompat:1.6.1'
   implementation 'com.braintreepayments.api:data-collector:5.17.0'
   implementation 'com.braintreepayments.api:paypal:5.17.0'
   implementation 'com.braintreepayments.api:card:5.17.0'
   implementation 'com.braintreepayments.api:google-pay:5.17.0'
+  implementation 'com.braintreepayments.api:three-d-secure:5.17.0'
 }
 

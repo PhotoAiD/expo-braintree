@@ -1,172 +1,184 @@
 import {
   withAndroidManifest,
+  withAndroidStyles,
   AndroidConfig,
   type ConfigPlugin,
 } from '@expo/config-plugins';
 
-const { getMainActivityOrThrow } = AndroidConfig.Manifest;
+const { getMainActivityOrThrow, getMainApplication } = AndroidConfig.Manifest;
 
-export const withExpoBraintreeAndroid: ConfigPlugin = (expoConfig) => {
-  return withAndroidManifest(expoConfig, (config) => {
-    config.modResults = addPaypalIntentFilter(config.modResults);
+export type ExpoBraintreePluginProps = {
+  /**
+   * Custom domain for deep linking (default: 'photoaid.com')
+   * This is used for PayPal return URL deep linking
+   */
+  androidDeepLinkDomain?: string;
+};
+
+export const withExpoBraintreeAndroid: ConfigPlugin<
+  ExpoBraintreePluginProps | void
+> = (expoConfig, props) => {
+  const domain = props?.androidDeepLinkDomain || 'photoaid.com';
+  expoConfig = withAndroidManifest(expoConfig, (config) => {
+    const packageName = config.android?.package || 'com.example.app';
+    config.modResults = addBraintreePaymentActivity(
+      config.modResults,
+      packageName,
+      domain
+    );
+    config.modResults = setMainActivityLaunchMode(config.modResults);
     return config;
   });
+
+  expoConfig = withAndroidStyles(expoConfig, (config) => {
+    config.modResults = addBraintreeTransparentTheme(config.modResults);
+    return config;
+  });
+
+  return expoConfig;
 };
 
-type ManifestData = {
-  $: {
-    [key: string]: string | undefined;
-    'android:host'?: string;
-    'android:pathPrefix'?: string;
-    'android:scheme'?: string;
-  };
-};
-
-// Add new intent filter
-// <activity>
-//   ...
-//   <intent-filter>
-//     <action android:name="android.intent.action.VIEW" />
-//     <category android:name="android.intent.category.DEFAULT" />
-//     <category android:name="android.intent.category.BROWSABLE" />
-//     <data android:scheme="${applicationId}.braintree" />
-//   </intent-filter>
-// </activity>;
-const intentActionView = 'android.intent.action.VIEW';
-const intentCategoryDefault = 'android.intent.category.DEFAULT';
-const intentCategoryBrowsable = 'android.intent.category.BROWSABLE';
-const intentDataBraintree = '${applicationId}.braintree';
-
-export const addPaypalIntentFilter = (
+// Set MainActivity launch mode to singleTop
+const setMainActivityLaunchMode = (
   modResults: AndroidConfig.Manifest.AndroidManifest
 ): AndroidConfig.Manifest.AndroidManifest => {
   const mainActivity = getMainActivityOrThrow(modResults);
-  // We want always to add the data to the first intent filter
-  const intentFilters = mainActivity['intent-filter'];
-  if (!intentFilters?.length) {
-    console.warn(
-      'withExpoBraintreeAndroid.addPaypalIntentFilter: No .Intent Filters'
-    );
-    return modResults;
-  }
-  const {
-    isIntentActionExist,
-    isIntentCategoryBrowsableExist,
-    isIntentCategoryDefaultExist,
-    isIntentDataBraintreeExist,
-    isIntentDataAppLinkExist,
-  } = checkAndroidManifestData(intentFilters);
 
-  // Add deep link intent filter (fallback for v5)
-  if (
-    !isIntentActionExist ||
-    !isIntentCategoryBrowsableExist ||
-    !isIntentCategoryDefaultExist ||
-    !isIntentDataBraintreeExist
-  ) {
-    intentFilters.push({
-      action: [
-        {
-          $: { 'android:name': intentActionView },
-        },
-      ],
-      category: [
-        { $: { 'android:name': intentCategoryDefault } },
-        { $: { 'android:name': intentCategoryBrowsable } },
-      ],
-      data: [{ $: { 'android:scheme': '${applicationId}.braintree' } }],
-    });
-  }
-
-  // Add App Link intent filter for v5 (HTTPS scheme)
-  if (!isIntentDataAppLinkExist) {
-    intentFilters.push({
-      action: [
-        {
-          $: { 'android:name': intentActionView },
-        },
-      ],
-      category: [
-        { $: { 'android:name': intentCategoryDefault } },
-        { $: { 'android:name': intentCategoryBrowsable } },
-      ],
-      data: [
-        {
-          $: {
-            'android:scheme': 'https',
-            'android:host': 'photoaid.com',
-            'android:pathPrefix': '/braintree/return',
-          },
-        },
-      ],
-    });
-  }
+  mainActivity.$['android:launchMode'] = 'singleTop';
 
   return modResults;
 };
 
-const checkAndroidManifestData = (
-  intentFilters: AndroidConfig.Manifest.ManifestIntentFilter[]
-) => ({
-  isIntentActionExist: isElementInAndroidManifestExist(
-    intentFilters,
-    intentActionView,
-    'action'
-  ),
-  isIntentCategoryDefaultExist: isElementInAndroidManifestExist(
-    intentFilters,
-    intentCategoryDefault,
-    'category'
-  ),
-  isIntentCategoryBrowsableExist: isElementInAndroidManifestExist(
-    intentFilters,
-    intentCategoryBrowsable,
-    'category'
-  ),
-  isIntentDataBraintreeExist: isElementInAndroidManifestExist(
-    intentFilters,
-    intentDataBraintree,
-    'data'
-  ),
-  isIntentDataAppLinkExist: isAppLinkInAndroidManifestExist(
-    intentFilters,
-    'https',
-    'photoaid.com',
-    '/braintree/return'
-  ),
-});
+// Add BraintreePaymentActivity to AndroidManifest
+const addBraintreePaymentActivity = (
+  modResults: AndroidConfig.Manifest.AndroidManifest,
+  packageName: string,
+  domain: string
+): AndroidConfig.Manifest.AndroidManifest => {
+  const mainApplication = getMainApplication(modResults);
 
-const isElementInAndroidManifestExist = (
-  intentFilters: AndroidConfig.Manifest.ManifestIntentFilter[] | undefined,
-  value: string,
-  type: 'action' | 'data' | 'category'
-) =>
-  !!intentFilters?.some((intentFilter) =>
-    intentFilter[type]?.find((item) => {
-      switch (type) {
-        case 'action':
-        case 'category':
-          return item.$['android:name'] === value;
-        case 'data':
-          const typedItem = item as ManifestData;
-          return typedItem.$['android:scheme'] === value;
-      }
-    })
+  if (!mainApplication) {
+    console.warn('withExpoBraintreeAndroid: No main application found');
+    return modResults;
+  }
+
+  if (!mainApplication.activity) {
+    mainApplication.activity = [];
+  }
+
+  // Check if BraintreePaymentActivity already exists
+  const existingActivity = mainApplication.activity.find(
+    (activity) =>
+      activity.$?.['android:name'] ===
+      'com.expobraintree.BraintreePaymentActivity'
   );
 
-const isAppLinkInAndroidManifestExist = (
-  intentFilters: AndroidConfig.Manifest.ManifestIntentFilter[] | undefined,
-  scheme: string,
-  host: string,
-  pathPrefix: string
-) =>
-  !!intentFilters?.some((intentFilter) =>
-    intentFilter.data?.find((item) => {
-      const typedItem = item as ManifestData;
-      return (
-        typedItem.$['android:scheme'] === scheme &&
-        typedItem.$['android:host'] === host &&
-        typedItem.$['android:pathPrefix'] === pathPrefix
-      );
-    })
+  if (existingActivity) {
+    console.log(
+      'withExpoBraintreeAndroid: BraintreePaymentActivity already exists'
+    );
+    return modResults;
+  }
+
+  // Add BraintreePaymentActivity
+  mainApplication.activity.push({
+    '$': {
+      'android:name': 'com.expobraintree.BraintreePaymentActivity',
+      'android:configChanges':
+        'keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode',
+      'android:launchMode': 'singleTask',
+      'android:windowSoftInputMode': 'adjustResize',
+      'android:theme': '@style/Theme.Braintree.Transparent',
+      'android:exported': 'true',
+    },
+    'intent-filter': [
+      {
+        action: [{ $: { 'android:name': 'android.intent.action.VIEW' } }],
+        category: [
+          { $: { 'android:name': 'android.intent.category.DEFAULT' } },
+          { $: { 'android:name': 'android.intent.category.BROWSABLE' } },
+        ],
+        data: [{ $: { 'android:scheme': `${packageName}.braintree` } }],
+      },
+      {
+        action: [{ $: { 'android:name': 'android.intent.action.VIEW' } }],
+        category: [
+          { $: { 'android:name': 'android.intent.category.DEFAULT' } },
+          { $: { 'android:name': 'android.intent.category.BROWSABLE' } },
+        ],
+        data: [
+          {
+            $: {
+              'android:scheme': 'https',
+              'android:host': domain,
+              'android:pathPrefix': '/braintree/return',
+            },
+          },
+        ],
+      },
+    ],
+  });
+
+  return modResults;
+};
+
+// Add transparent theme to styles.xml
+const addBraintreeTransparentTheme = (
+  styles: AndroidConfig.Resources.ResourceXML
+): AndroidConfig.Resources.ResourceXML => {
+  if (!styles.resources) {
+    styles.resources = {};
+  }
+
+  if (!styles.resources.style) {
+    styles.resources.style = [];
+  }
+
+  // Check if theme already exists
+  const existingTheme = styles.resources.style.find(
+    (style) => style.$ && style.$.name === 'Theme.Braintree.Transparent'
   );
+
+  if (existingTheme) {
+    console.log(
+      'withExpoBraintreeAndroid: Theme.Braintree.Transparent already exists'
+    );
+    return styles;
+  }
+
+  // Add transparent theme
+  styles.resources.style.push({
+    $: {
+      name: 'Theme.Braintree.Transparent',
+      parent: 'Theme.AppCompat.NoActionBar',
+    },
+    item: [
+      {
+        _: 'true',
+        $: { name: 'android:windowIsTranslucent' },
+      },
+      {
+        _: '@android:color/transparent',
+        $: { name: 'android:windowBackground' },
+      },
+      {
+        _: '@null',
+        $: { name: 'android:windowContentOverlay' },
+      },
+      {
+        _: 'true',
+        $: { name: 'android:windowNoTitle' },
+      },
+      {
+        _: 'false',
+        $: { name: 'android:windowIsFloating' },
+      },
+      {
+        _: 'false',
+        $: { name: 'android:backgroundDimEnabled' },
+      },
+    ],
+  });
+
+  return styles;
+};

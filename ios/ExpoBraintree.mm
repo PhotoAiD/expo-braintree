@@ -29,7 +29,7 @@ RCT_EXTERN_METHOD(presentApplePaymentSheet:(NSDictionary*)options
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(tokenizeApplePayPayment:(NSDictionary*)options
+RCT_EXTERN_METHOD(verifyThreeDSecure:(NSDictionary*)options
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 
