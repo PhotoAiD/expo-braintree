@@ -31,6 +31,7 @@ func prepareThreeDSecureRequest(options: [String: Any]) -> BTThreeDSecureRequest
 
   threeDSecureRequest.additionalInformation = threeDsRequestAdditionalInformation
   threeDSecureRequest.billingAddress = threeDsRequestPostalAddress
+  threeDSecureRequest.requestorAppURL = options["requestorAppURL"] as? String
 
   return threeDSecureRequest
 }

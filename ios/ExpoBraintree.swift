@@ -100,6 +100,7 @@ class ExpoBraintree: NSObject, PaymentExecutorListener {
     let use3DSecure = options["use3DSecure"] as? Bool ?? false
     let amount = options["amount"] as? String ?? "0"
     let currency = options["currency"] as? String ?? "USD"
+    let requestorAppURL = options["requestorAppURL"] as? String
 
     let args = BasePaymentArgs(
       clientToken: clientToken,
@@ -111,7 +112,8 @@ class ExpoBraintree: NSObject, PaymentExecutorListener {
         postalCode: postalCode,
         use3DSecure: use3DSecure,
         amount: amount,
-        currency: currency
+        currency: currency,
+        requestorAppURL: requestorAppURL
       ),
       email: options["email"] as? String ?? "",
       deviceData: options["deviceData"] as? String ?? ""

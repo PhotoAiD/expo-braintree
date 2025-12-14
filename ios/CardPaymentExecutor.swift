@@ -34,6 +34,7 @@ class CardPaymentExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequestD
       let postalCode,
       let use3DSecure,
       _,
+      _,
       _
     ) = args.paymentMethod else {
       handleError(message: "Invalid payment method", localizedMessage: "Expected Card")
@@ -86,7 +87,7 @@ class CardPaymentExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequestD
   }
 
   private func requestThreeDSecure(cardNonce: BTCardNonce) {
-    guard case .card(_, _, _, _, _, _, let amount, _) = args.paymentMethod else {
+    guard case .card(_, _, _, _, _, _, let amount, _, let requestorAppURL) = args.paymentMethod else {
       handleError(message: "Invalid payment method", localizedMessage: "Expected Card")
       return
     }
@@ -109,6 +110,7 @@ class CardPaymentExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequestD
     threeDSecureRequest.nonce = cardNonce.nonce
     threeDSecureRequest.email = args.email
     threeDSecureRequest.threeDSecureRequestDelegate = self
+    threeDSecureRequest.requestorAppURL = requestorAppURL
 
     secureClient.startPaymentFlow(threeDSecureRequest) { [weak self] (threeDSecureResult, error) in
       guard let self = self else { return }
@@ -156,7 +158,7 @@ class CardPaymentExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequestD
   }
 
   private func handleSuccessWithCardNonce(cardNonce: BTCardNonce) {
-    guard case .card(_, _, _, _, _, _, let amount, let currency) = args.paymentMethod else {
+    guard case .card(_, _, _, _, _, _, let amount, let currency, _) = args.paymentMethod else {
       handleError(message: "Invalid payment method", localizedMessage: "Expected Card")
       return
     }
