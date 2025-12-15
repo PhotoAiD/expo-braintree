@@ -18,7 +18,8 @@ enum PaymentMethod {
     postalCode: String?,
     use3DSecure: Bool,
     amount: String,
-    currency: String
+    currency: String,
+    requestorAppURL: String?
   )
   case applePay(options: [String: Any])
   case threeDSecure(nonce: String, amount: String, options: [String: Any])

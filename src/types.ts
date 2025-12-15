@@ -44,6 +44,11 @@ export type TokenizeCardOptions = {
   amount?: string;
   currency?: string;
   use3DSecure?: boolean;
+  /**
+   * The URL scheme for OOB (Out-of-Band) 3DS authentication.
+   * Example: "photoaid://3ds-return"
+   */
+  requestorAppURL?: string;
 };
 
 export type BTPayPalAccountNonceAddressResult = {
@@ -199,6 +204,12 @@ export type ThreeDSecureRequestOptions = {
   exemptionRequested?: boolean;
   mobilePhoneNumber?: string;
   cardAddChallenge?: 'requested' | 'not_requested';
+  /**
+   * The URL scheme for OOB (Out-of-Band) authentication to return to this app.
+   * Required for EMV 3DS 2.2+ when bank app redirects are used.
+   * Example: "photoaid://3ds-return"
+   */
+  requestorAppURL?: string;
 };
 
 export type ThreeDSecureInfo = {
