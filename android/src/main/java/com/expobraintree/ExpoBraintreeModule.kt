@@ -373,40 +373,27 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
     }
 
     private fun handleSuccessResult(result: PaymentResultModel.Success, promise: Promise) {
-        Log.d(TAG, "[handleSuccessResult] paymentType=${result.paymentType}")
+        Log.d(TAG, "[handleSuccessResult] paymentType=${result.paymentType}, has3DSInfo=${result.threeDSecureInfo != null}")
 
-        when (result.paymentType) {
-            "PayPal" -> {
-                val map = Arguments.createMap().apply {
-                    putString("nonce", result.nonce)
-                    putString("email", result.email)
-                    putString("deviceData", result.deviceData)
-                }
-                promise.resolve(map)
+        val map = Arguments.createMap().apply {
+            putString("nonce", result.nonce)
+            putString("deviceData", result.deviceData)
+
+            when (result.paymentType) {
+                "PayPal" -> putString("email", result.email)
             }
-            "Card", "Card3DS" -> {
-                val map = Arguments.createMap().apply {
-                    putString("nonce", result.nonce)
-                    putString("deviceData", result.deviceData)
+
+            result.threeDSecureInfo?.let { info ->
+                val threeDSecureMap = Arguments.createMap().apply {
+                    putBoolean("liabilityShifted", info.liabilityShifted)
+                    putBoolean("liabilityShiftPossible", info.liabilityShiftPossible)
+                    putBoolean("wasVerified", info.wasVerified)
+                    putBoolean("challengeRequired", info.challengeRequired)
                 }
-                promise.resolve(map)
-            }
-            "GooglePay" -> {
-                val map = Arguments.createMap().apply {
-                    putString("nonce", result.nonce)
-                    putString("deviceData", result.deviceData)
-                }
-                promise.resolve(map)
-            }
-            else -> {
-                Log.w(TAG, "[handleSuccessResult] Unknown payment type: ${result.paymentType}")
-                val map = Arguments.createMap().apply {
-                    putString("nonce", result.nonce)
-                    putString("deviceData", result.deviceData)
-                }
-                promise.resolve(map)
+                putMap("threeDSecureInfo", threeDSecureMap)
             }
         }
+        promise.resolve(map)
     }
 
     override fun onNewIntent(intent: Intent) {

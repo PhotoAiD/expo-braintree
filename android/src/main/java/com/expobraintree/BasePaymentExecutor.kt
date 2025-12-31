@@ -37,9 +37,10 @@ abstract class BasePaymentExecutor(
         nonce: String,
         amount: String,
         currency: String,
-        paymentType: String
+        paymentType: String,
+        threeDSecureInfo: ThreeDSecureInfo? = null
     ) {
-        Log.d(TAG, "[Success] paymentType=$paymentType, amount=$amount, currency=$currency, noncePresent=${nonce.isNotEmpty()}")
+        Log.d(TAG, "[Success] paymentType=$paymentType, amount=$amount, currency=$currency, noncePresent=${nonce.isNotEmpty()}, 3dsInfo=$threeDSecureInfo")
         listener.onPaymentResult(
             PaymentResultModel.Success(
                 nonce = nonce,
@@ -47,7 +48,8 @@ abstract class BasePaymentExecutor(
                 currency = currency,
                 deviceData = args.deviceData,
                 email = args.email,
-                paymentType = paymentType
+                paymentType = paymentType,
+                threeDSecureInfo = threeDSecureInfo
             )
         )
     }

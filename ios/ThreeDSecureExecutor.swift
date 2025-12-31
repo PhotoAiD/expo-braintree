@@ -14,6 +14,7 @@ class ThreeDSecureExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequest
   weak var listener: PaymentExecutorListener?
   private var threeDSecureClient: BTThreeDSecureClient?
   private weak var viewController: UIViewController?
+  private var challengeRequired: Bool = false
 
   init(args: BasePaymentArgs, listener: PaymentExecutorListener?) {
     self.args = args
@@ -61,25 +62,10 @@ class ThreeDSecureExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequest
       if let threeDSecureResult = threeDSecureResult,
          let tokenizedCard = threeDSecureResult.tokenizedCard {
 
-        let threeDSecureInfo = tokenizedCard.threeDSecureInfo
+        let info = tokenizedCard.threeDSecureInfo
+        NSLog("[ThreeDSecureExecutor] 3DS success, challengeRequired=\(self.challengeRequired), liabilityShifted=\(info.liabilityShifted), liabilityShiftPossible=\(info.liabilityShiftPossible), wasVerified=\(info.wasVerified)")
 
-        if !threeDSecureInfo.liabilityShiftPossible {
-          self.handleError(
-            message: ERROR_TYPES.THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY.rawValue,
-            localizedMessage: "3D Secure liability shift not possible"
-          )
-          return
-        }
-
-        if !threeDSecureInfo.liabilityShifted {
-          self.handleError(
-            message: ERROR_TYPES.THREE_D_SECURE_LIABILITY_NOT_SHIFTED.rawValue,
-            localizedMessage: "3D Secure liability not shifted"
-          )
-          return
-        }
-
-        let additionalData = prepareThreeDSecureNonceResult(nonce: threeDSecureResult) as? [String: Any]
+        let additionalData = prepareThreeDSecureNonceResult(nonce: threeDSecureResult, challengeRequired: self.challengeRequired) as? [String: Any]
         let currency = options["currencyCode"] as? String ?? ""
 
         self.handleSuccess(
@@ -110,6 +96,13 @@ class ThreeDSecureExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequest
   }
 
   func onLookupComplete(_ request: BTThreeDSecureRequest, lookupResult: BTThreeDSecureResult, next: @escaping () -> Void) {
+    if let lookup = lookupResult.lookup {
+      challengeRequired = lookup.requiresUserAuthentication
+      NSLog("[ThreeDSecureExecutor] onLookupComplete: requiresUserAuthentication=\(lookup.requiresUserAuthentication)")
+    } else {
+      challengeRequired = false
+      NSLog("[ThreeDSecureExecutor] onLookupComplete: no lookup info, assuming no challenge required")
+    }
     next()
   }
 
@@ -118,5 +111,6 @@ class ThreeDSecureExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequest
 
   func onDestroy() {
     threeDSecureClient = nil
+    challengeRequired = false
   }
 }

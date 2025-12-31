@@ -61,12 +61,20 @@ class ThreeDSecureExecutor(
                     threeDSecureLauncher?.launch(paymentAuthRequest)
                 }
                 is ThreeDSecurePaymentAuthRequest.LaunchNotRequired -> {
-                    Log.d(TAG, "[requestPayment] 3DS launch not required, using nonce directly")
+                    val nonce = paymentAuthRequest.nonce
+                    val info = nonce.threeDSecureInfo
+                    Log.d(TAG, "[requestPayment] 3DS launch not required, liabilityShifted=${info.liabilityShifted}, liabilityShiftPossible=${info.liabilityShiftPossible}")
                     handleSuccess(
-                        nonce = paymentAuthRequest.nonce.string,
+                        nonce = nonce.string,
                         amount = paymentMethod.amount,
                         currency = paymentMethod.currency,
-                        paymentType = "Card3DS"
+                        paymentType = "Card3DS",
+                        threeDSecureInfo = ThreeDSecureInfo(
+                            liabilityShifted = info.liabilityShifted,
+                            liabilityShiftPossible = info.liabilityShiftPossible,
+                            wasVerified = info.wasVerified,
+                            challengeRequired = false
+                        )
                     )
                 }
                 is ThreeDSecurePaymentAuthRequest.Failure -> {
@@ -86,29 +94,22 @@ class ThreeDSecureExecutor(
             when (threeDSecureResult) {
                 is ThreeDSecureResult.Success -> {
                     val threeDSecureNonce = threeDSecureResult.nonce
-                    val threeDSecureInfo = threeDSecureNonce.threeDSecureInfo
+                    val info = threeDSecureNonce.threeDSecureInfo
 
-                    Log.d(TAG, "[onThreeDSecurePaymentAuthResult] 3DS success, liabilityShiftPossible=${threeDSecureInfo.liabilityShiftPossible}, liabilityShifted=${threeDSecureInfo.liabilityShifted}")
-
-                    if (!threeDSecureInfo.liabilityShiftPossible) {
-                        Log.e(TAG, "[onThreeDSecurePaymentAuthResult] Liability shift not possible")
-                        handleError("3D Secure liability shift not possible", "3D Secure liability shift not possible")
-                        return@tokenize
-                    }
-
-                    if (!threeDSecureInfo.liabilityShifted) {
-                        Log.e(TAG, "[onThreeDSecurePaymentAuthResult] Liability not shifted")
-                        handleError("3D Secure liability not shifted", "3D Secure liability not shifted")
-                        return@tokenize
-                    }
+                    Log.d(TAG, "[onThreeDSecurePaymentAuthResult] 3DS success after challenge, liabilityShiftPossible=${info.liabilityShiftPossible}, liabilityShifted=${info.liabilityShifted}, wasVerified=${info.wasVerified}")
 
                     val paymentMethod = args.paymentMethod as PaymentMethod.ThreeDSecure
-                    Log.d(TAG, "[onThreeDSecurePaymentAuthResult] 3DS verification successful")
                     handleSuccess(
                         nonce = threeDSecureNonce.string,
                         amount = paymentMethod.amount,
                         currency = paymentMethod.currency,
-                        paymentType = "Card3DS"
+                        paymentType = "Card3DS",
+                        threeDSecureInfo = ThreeDSecureInfo(
+                            liabilityShifted = info.liabilityShifted,
+                            liabilityShiftPossible = info.liabilityShiftPossible,
+                            wasVerified = info.wasVerified,
+                            challengeRequired = true
+                        )
                     )
                 }
                 is ThreeDSecureResult.Failure -> {

@@ -14,6 +14,7 @@ func prepareThreeDSecureRequest(options: [String: Any]) -> BTThreeDSecureRequest
 
   threeDSecureRequest.nonce = options["nonce"] as? String
   threeDSecureRequest.email = options["email"] as? String
+  threeDSecureRequest.requestorAppURL = options["requestorAppURL"] as? String
 
   let threeDsRequestPostalAddress = BTThreeDSecurePostalAddress()
   threeDsRequestPostalAddress.givenName = options["givenName"] as? String
@@ -31,12 +32,11 @@ func prepareThreeDSecureRequest(options: [String: Any]) -> BTThreeDSecureRequest
 
   threeDSecureRequest.additionalInformation = threeDsRequestAdditionalInformation
   threeDSecureRequest.billingAddress = threeDsRequestPostalAddress
-  threeDSecureRequest.requestorAppURL = options["requestorAppURL"] as? String
 
   return threeDSecureRequest
 }
 
-func prepareThreeDSecureNonceResult(nonce: BTThreeDSecureResult) -> NSDictionary {
+func prepareThreeDSecureNonceResult(nonce: BTThreeDSecureResult, challengeRequired: Bool) -> NSDictionary {
   let result = NSMutableDictionary()
 
   if let tokenizedCard = nonce.tokenizedCard {
@@ -52,9 +52,19 @@ func prepareThreeDSecureNonceResult(nonce: BTThreeDSecureResult) -> NSDictionary
     threeDSecureInfo["liabilityShifted"] = tokenizedCard.threeDSecureInfo.liabilityShifted
     threeDSecureInfo["liabilityShiftPossible"] = tokenizedCard.threeDSecureInfo.liabilityShiftPossible
     threeDSecureInfo["wasVerified"] = tokenizedCard.threeDSecureInfo.wasVerified
+    threeDSecureInfo["challengeRequired"] = challengeRequired
 
     result["threeDSecureInfo"] = threeDSecureInfo
   }
 
   return result
+}
+
+func prepareThreeDSecureInfoFromCardNonce(cardNonce: BTCardNonce, challengeRequired: Bool) -> [String: Any] {
+  return [
+    "liabilityShifted": cardNonce.threeDSecureInfo.liabilityShifted,
+    "liabilityShiftPossible": cardNonce.threeDSecureInfo.liabilityShiftPossible,
+    "wasVerified": cardNonce.threeDSecureInfo.wasVerified,
+    "challengeRequired": challengeRequired
+  ]
 }

@@ -16,6 +16,7 @@ class CardPaymentExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequestD
   private var threeDSecureClient: BTThreeDSecureClient?
   private var currentCardNonce: String?
   private weak var viewController: UIViewController?
+  private var challengeRequired: Bool = false
 
   init(args: BasePaymentArgs, listener: PaymentExecutorListener?) {
     self.args = args
@@ -118,25 +119,10 @@ class CardPaymentExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequestD
       if let threeDSecureResult = threeDSecureResult,
          let tokenizedCard = threeDSecureResult.tokenizedCard {
 
-        let threeDSecureInfo = tokenizedCard.threeDSecureInfo
+        let info = tokenizedCard.threeDSecureInfo
+        NSLog("[CardPaymentExecutor] 3DS success, challengeRequired=\(self.challengeRequired), liabilityShifted=\(info.liabilityShifted), liabilityShiftPossible=\(info.liabilityShiftPossible), wasVerified=\(info.wasVerified)")
 
-        if !threeDSecureInfo.liabilityShiftPossible {
-          self.handleError(
-            message: ERROR_TYPES.THREE_D_SECURE_NOT_ABLE_TO_SHIFT_LIABILITY.rawValue,
-            localizedMessage: "3D Secure liability shift not possible"
-          )
-          return
-        }
-
-        if !threeDSecureInfo.liabilityShifted {
-          self.handleError(
-            message: ERROR_TYPES.THREE_D_SECURE_LIABILITY_NOT_SHIFTED.rawValue,
-            localizedMessage: "3D Secure liability not shifted"
-          )
-          return
-        }
-
-        self.handleSuccessWithCardNonce(cardNonce: tokenizedCard)
+        self.handleSuccessWithThreeDSecure(cardNonce: tokenizedCard)
       } else if let error = error {
         if let threeDSecureError = error as? BTThreeDSecureError, threeDSecureError == .canceled {
           self.handleCancel()
@@ -174,7 +160,48 @@ class CardPaymentExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequestD
     )
   }
 
+  private func handleSuccessWithThreeDSecure(cardNonce: BTCardNonce) {
+    guard case .card(_, _, _, _, _, _, let amount, let currency, _) = args.paymentMethod else {
+      handleError(message: "Invalid payment method", localizedMessage: "Expected Card")
+      return
+    }
+
+    let threeDSecureInfo = prepareThreeDSecureInfoFromCardNonce(
+      cardNonce: cardNonce,
+      challengeRequired: challengeRequired
+    )
+
+    // Include all card data plus 3DS info (ExpoBraintree returns additionalData directly for Card type)
+    let additionalData: [String: Any] = [
+      "nonce": cardNonce.nonce,
+      "cardNetwork": cardNonce.cardNetwork as Any,
+      "lastFour": cardNonce.lastFour as Any,
+      "lastTwo": cardNonce.lastTwo as Any,
+      "expirationMonth": cardNonce.expirationMonth as Any,
+      "expirationYear": cardNonce.expirationYear as Any,
+      "threeDSecureInfo": threeDSecureInfo
+    ]
+
+    handleSuccess(
+      nonce: cardNonce.nonce,
+      amount: amount,
+      currency: currency.isEmpty ? "USD" : currency,
+      paymentType: "Card",
+      additionalData: additionalData
+    )
+  }
+
   func onLookupComplete(_ request: BTThreeDSecureRequest, lookupResult: BTThreeDSecureResult, next: @escaping () -> Void) {
+    // Check if challenge is required based on lookup result
+    // If lookup returns a tokenizedCard directly without launching challenge UI, challengeRequired = false
+    // Otherwise, the flow will show challenge UI, so challengeRequired = true
+    if let lookup = lookupResult.lookup {
+      challengeRequired = lookup.requiresUserAuthentication
+      NSLog("[CardPaymentExecutor] onLookupComplete: requiresUserAuthentication=\(lookup.requiresUserAuthentication)")
+    } else {
+      challengeRequired = false
+      NSLog("[CardPaymentExecutor] onLookupComplete: no lookup info, assuming no challenge required")
+    }
     next()
   }
 
@@ -185,5 +212,6 @@ class CardPaymentExecutor: NSObject, BasePaymentExecutor, BTThreeDSecureRequestD
     cardClient = nil
     threeDSecureClient = nil
     currentCardNonce = nil
+    challengeRequired = false
   }
 }
