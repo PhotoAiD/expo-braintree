@@ -3,6 +3,14 @@ package com.expobraintree
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
 
+@Parcelize
+data class ThreeDSecureInfo(
+    val liabilityShifted: Boolean,
+    val liabilityShiftPossible: Boolean,
+    val wasVerified: Boolean,
+    val challengeRequired: Boolean
+) : Parcelable
+
 sealed class PaymentResultModel : Parcelable {
     @Parcelize
     data class Success(
@@ -11,7 +19,8 @@ sealed class PaymentResultModel : Parcelable {
         val currency: String,
         val deviceData: String,
         val email: String,
-        val paymentType: String
+        val paymentType: String,
+        val threeDSecureInfo: ThreeDSecureInfo? = null
     ) : PaymentResultModel()
 
     @Parcelize

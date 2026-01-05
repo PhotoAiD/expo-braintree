@@ -135,8 +135,18 @@ class CardPaymentExecutor(
                     handleError(paymentAuthRequest.error.message, paymentAuthRequest.error.localizedMessage)
                 }
                 is ThreeDSecurePaymentAuthRequest.LaunchNotRequired -> {
-                    Log.d(TAG, "[requestThreeDSecure] 3DS launch not required, using nonce directly")
-                    handleSuccessWithCardMethod(paymentAuthRequest.nonce.string)
+                    val nonce = paymentAuthRequest.nonce
+                    val info = nonce.threeDSecureInfo
+                    Log.d(TAG, "[requestThreeDSecure] 3DS launch not required, liabilityShifted=${info.liabilityShifted}, liabilityShiftPossible=${info.liabilityShiftPossible}")
+                    handleSuccessWithCardMethod(
+                        nonce = nonce.string,
+                        threeDSecureInfo = ThreeDSecureInfo(
+                            liabilityShifted = info.liabilityShifted,
+                            liabilityShiftPossible = info.liabilityShiftPossible,
+                            wasVerified = info.wasVerified,
+                            challengeRequired = false
+                        )
+                    )
                 }
                 is ThreeDSecurePaymentAuthRequest.ReadyToLaunch -> {
                     Log.d(TAG, "[requestThreeDSecure] 3DS ready to launch, launching...")
@@ -155,24 +165,19 @@ class CardPaymentExecutor(
             when (threeDSecureResult) {
                 is ThreeDSecureResult.Success -> {
                     val threeDSecureNonce = threeDSecureResult.nonce
-                    val threeDSecureInfo = threeDSecureNonce.threeDSecureInfo
+                    val info = threeDSecureNonce.threeDSecureInfo
 
-                    Log.d(TAG, "[onThreeDSecurePaymentAuthResult] 3DS success, liabilityShiftPossible=${threeDSecureInfo.liabilityShiftPossible}, liabilityShifted=${threeDSecureInfo.liabilityShifted}")
+                    Log.d(TAG, "[onThreeDSecurePaymentAuthResult] 3DS success after challenge, liabilityShiftPossible=${info.liabilityShiftPossible}, liabilityShifted=${info.liabilityShifted}, wasVerified=${info.wasVerified}")
 
-                    if (!threeDSecureInfo.liabilityShiftPossible) {
-                        Log.e(TAG, "[onThreeDSecurePaymentAuthResult] Liability shift not possible")
-                        handleError("3D Secure liability shift not possible", "3D Secure liability shift not possible")
-                        return@tokenize
-                    }
-
-                    if (!threeDSecureInfo.liabilityShifted) {
-                        Log.e(TAG, "[onThreeDSecurePaymentAuthResult] Liability not shifted")
-                        handleError("3D Secure liability not shifted", "3D Secure liability not shifted")
-                        return@tokenize
-                    }
-
-                    Log.d(TAG, "[onThreeDSecurePaymentAuthResult] 3DS verification successful")
-                    handleSuccessWithCardMethod(threeDSecureNonce.string)
+                    handleSuccessWithCardMethod(
+                        nonce = threeDSecureNonce.string,
+                        threeDSecureInfo = ThreeDSecureInfo(
+                            liabilityShifted = info.liabilityShifted,
+                            liabilityShiftPossible = info.liabilityShiftPossible,
+                            wasVerified = info.wasVerified,
+                            challengeRequired = true
+                        )
+                    )
                 }
                 is ThreeDSecureResult.Failure -> {
                     Log.e(TAG, "[onThreeDSecurePaymentAuthResult] 3DS failure: ${threeDSecureResult.error.message}")
@@ -186,13 +191,14 @@ class CardPaymentExecutor(
         }
     }
 
-    private fun handleSuccessWithCardMethod(nonce: String) {
+    private fun handleSuccessWithCardMethod(nonce: String, threeDSecureInfo: ThreeDSecureInfo? = null) {
         val paymentMethod = args.paymentMethod as PaymentMethod.Card
         handleSuccess(
             nonce = nonce,
             amount = paymentMethod.amount,
             currency = if (paymentMethod.currency.isNotEmpty()) paymentMethod.currency else "USD",
-            paymentType = "Card"
+            paymentType = "Card",
+            threeDSecureInfo = threeDSecureInfo
         )
     }
 

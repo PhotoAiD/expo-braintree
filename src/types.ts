@@ -78,6 +78,8 @@ export type BTCardTokenizationNonceResult = {
   lastFour?: string;
   expirationMonth?: string;
   expirationYear?: string;
+  /** Present when use3DSecure is true */
+  threeDSecureInfo?: ThreeDSecureInfo;
 };
 
 export type BTPayPalGetDeviceDataResult = string;
@@ -216,6 +218,8 @@ export type ThreeDSecureInfo = {
   liabilityShifted: boolean;
   liabilityShiftPossible: boolean;
   wasVerified: boolean;
+  /** True if user had to complete a 3DS challenge, false if authentication was frictionless */
+  challengeRequired: boolean;
 };
 
 export type ThreeDSecureNonceResult = {
