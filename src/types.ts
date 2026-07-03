@@ -154,11 +154,44 @@ export type ApplePayNonceResult = {
 };
 
 // Google Pay Types
+
+/**
+ * A selectable delivery method shown inside the Google Pay sheet during express
+ * checkout. The sheet total recalculates live as the user picks an option.
+ */
+export type GooglePayShippingOption = {
+  /** Stable identifier returned as `shippingOptionId` in the result. */
+  id: string;
+  /** Text shown to the user, e.g. "Standard — 3-5 days". */
+  label: string;
+  /** Optional secondary line shown under the label. */
+  description?: string;
+  /** Delivery price added to the base amount, e.g. "5.00". Use "0" for free. */
+  price: string;
+};
+
 export type GooglePayOptions = {
   clientToken: string;
   amount: string;
   currencyCode?: string;
   merchantName?: string;
+  isShippingAddressRequired?: boolean;
+  isPhoneNumberRequired?: boolean;
+  isBillingAddressRequired?: boolean;
+  isEmailRequired?: boolean;
+  /**
+   * Delivery methods to present inside the Google Pay sheet (express checkout).
+   * When provided, the sheet shows a selectable list and the total updates live
+   * as `amount + selected option price`.
+   */
+  shippingOptions?: GooglePayShippingOption[];
+  /** Id of the shipping option selected by default. */
+  defaultShippingOptionId?: string;
+};
+
+export type GooglePayAddressResult = BTPayPalAccountNonceAddressResult & {
+  /** Present when isPhoneNumberRequired is true. */
+  phoneNumber?: string;
 };
 
 export type GooglePayNonceResult = {
@@ -168,8 +201,10 @@ export type GooglePayNonceResult = {
   isDefault?: boolean;
   cardNetwork?: string;
   email?: string;
-  shippingAddress?: BTPayPalAccountNonceAddressResult;
-  billingAddress?: BTPayPalAccountNonceAddressResult;
+  shippingAddress?: GooglePayAddressResult;
+  billingAddress?: GooglePayAddressResult;
+  /** Id of the delivery method the user selected (express checkout only). */
+  shippingOptionId?: string;
 };
 
 // 3D Secure Types

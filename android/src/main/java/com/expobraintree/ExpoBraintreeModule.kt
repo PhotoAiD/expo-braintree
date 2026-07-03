@@ -17,6 +17,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.bridge.Arguments
@@ -231,13 +232,30 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
             val email = data.getString("email") ?: ""
             val amount = data.getString("amount") ?: ""
             val currency = data.getString("currencyCode") ?: "USD"
+            val merchantName = data.getString("merchantName") ?: "PhotoAiD"
+            val isShippingAddressRequired =
+                if (data.hasKey("isShippingAddressRequired")) data.getBoolean("isShippingAddressRequired") else false
+            val isPhoneNumberRequired =
+                if (data.hasKey("isPhoneNumberRequired")) data.getBoolean("isPhoneNumberRequired") else false
+            val isBillingAddressRequired =
+                if (data.hasKey("isBillingAddressRequired")) data.getBoolean("isBillingAddressRequired") else false
+            val isEmailRequired =
+                if (data.hasKey("isEmailRequired")) data.getBoolean("isEmailRequired") else false
+            val shippingOptions = parseShippingOptions(data.getArray("shippingOptions"))
+            val defaultShippingOptionId = data.getString("defaultShippingOptionId")
 
             val paymentArgs = BasePaymentArgs(
                 clientToken = clientToken,
                 paymentMethod = PaymentMethod.GooglePay(
                     amount = amount,
                     currency = currency,
-                    merchantName = "PhotoAiD"
+                    merchantName = merchantName,
+                    isShippingAddressRequired = isShippingAddressRequired,
+                    isPhoneNumberRequired = isPhoneNumberRequired,
+                    isBillingAddressRequired = isBillingAddressRequired,
+                    isEmailRequired = isEmailRequired,
+                    shippingOptions = shippingOptions,
+                    defaultShippingOptionId = defaultShippingOptionId
                 ),
                 email = email,
                 deviceData = deviceData
@@ -381,6 +399,12 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
 
             when (result.paymentType) {
                 "PayPal" -> putString("email", result.email)
+                "GooglePay" -> {
+                    result.shippingAddress?.let { putMap("shippingAddress", googlePayAddressToMap(it)) }
+                    result.billingAddress?.let { putMap("billingAddress", googlePayAddressToMap(it)) }
+                    result.googlePayEmail?.let { putString("email", it) }
+                    result.shippingOptionId?.let { putString("shippingOptionId", it) }
+                }
             }
 
             result.threeDSecureInfo?.let { info ->
@@ -394,6 +418,37 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
             }
         }
         promise.resolve(map)
+    }
+
+    private fun parseShippingOptions(array: ReadableArray?): List<GooglePayShippingOption> {
+        if (array == null) return emptyList()
+        val result = mutableListOf<GooglePayShippingOption>()
+        for (i in 0 until array.size()) {
+            val map = array.getMap(i) ?: continue
+            val id = map.getString("id") ?: continue
+            result.add(
+                GooglePayShippingOption(
+                    id = id,
+                    label = map.getString("label") ?: "",
+                    description = if (map.hasKey("description")) map.getString("description") else null,
+                    price = map.getString("price") ?: "0"
+                )
+            )
+        }
+        return result
+    }
+
+    private fun googlePayAddressToMap(address: GooglePayAddress): WritableMap {
+        return Arguments.createMap().apply {
+            putString("recipientName", address.recipientName)
+            putString("phoneNumber", address.phoneNumber)
+            putString("streetAddress", address.streetAddress)
+            putString("extendedAddress", address.extendedAddress)
+            putString("locality", address.locality)
+            putString("region", address.region)
+            putString("postalCode", address.postalCode)
+            putString("countryCodeAlpha2", address.countryCodeAlpha2)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

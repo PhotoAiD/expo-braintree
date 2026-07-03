@@ -38,7 +38,11 @@ abstract class BasePaymentExecutor(
         amount: String,
         currency: String,
         paymentType: String,
-        threeDSecureInfo: ThreeDSecureInfo? = null
+        threeDSecureInfo: ThreeDSecureInfo? = null,
+        shippingAddress: GooglePayAddress? = null,
+        billingAddress: GooglePayAddress? = null,
+        googlePayEmail: String? = null,
+        shippingOptionId: String? = null
     ) {
         Log.d(TAG, "[Success] paymentType=$paymentType, amount=$amount, currency=$currency, noncePresent=${nonce.isNotEmpty()}, 3dsInfo=$threeDSecureInfo")
         listener.onPaymentResult(
@@ -49,7 +53,11 @@ abstract class BasePaymentExecutor(
                 deviceData = args.deviceData,
                 email = args.email,
                 paymentType = paymentType,
-                threeDSecureInfo = threeDSecureInfo
+                threeDSecureInfo = threeDSecureInfo,
+                shippingAddress = shippingAddress,
+                billingAddress = billingAddress,
+                googlePayEmail = googlePayEmail,
+                shippingOptionId = shippingOptionId
             )
         )
     }

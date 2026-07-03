@@ -121,6 +121,15 @@ class BraintreePaymentActivity : AppCompatActivity(), PaymentExecutorListener {
         paymentExecutor?.onResume(intent)
     }
 
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        Log.d(TAG, "[onActivityResult] requestCode=$requestCode, resultCode=$resultCode")
+        if (requestCode == GooglePayPaymentExecutor.REQUEST_CODE_GOOGLE_PAY_EXPRESS) {
+            (paymentExecutor as? GooglePayPaymentExecutor)?.handleExpressResult(resultCode, data)
+        }
+    }
+
     override fun onDestroy() {
         Log.d(TAG, "[onDestroy] Activity destroyed, isFinishing=$isFinishing")
         paymentExecutor?.onDestroy()

@@ -1,2 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+          Google Pay dynamic price-update callback service (express checkout).
+          Google Play Services binds to it when a PaymentDataRequest declares callbackIntents.
+          Requires play-services-wallet 20.0.0+. This is the manifest used under AGP 7.3+/8.x
+          (namespace mode) per build.gradle's manifest.srcFile, so the service must be declared
+          here (not just in the legacy AndroidManifest.xml, which isn't used in that mode).
+        -->
+        <service
+            android:name=".GooglePayCallbackService"
+            android:permission="com.google.android.gms.permission.BIND_PAYMENTS_CALLBACK_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wallet.callback.PAYMENT_DATA_CALLBACKS" />
+            </intent-filter>
+        </service>
+    </application>
 </manifest>

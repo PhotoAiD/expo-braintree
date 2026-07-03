@@ -11,6 +11,18 @@ data class ThreeDSecureInfo(
     val challengeRequired: Boolean
 ) : Parcelable
 
+@Parcelize
+data class GooglePayAddress(
+    val recipientName: String?,
+    val phoneNumber: String?,
+    val streetAddress: String?,
+    val extendedAddress: String?,
+    val locality: String?,
+    val region: String?,
+    val postalCode: String?,
+    val countryCodeAlpha2: String?
+) : Parcelable
+
 sealed class PaymentResultModel : Parcelable {
     @Parcelize
     data class Success(
@@ -20,7 +32,11 @@ sealed class PaymentResultModel : Parcelable {
         val deviceData: String,
         val email: String,
         val paymentType: String,
-        val threeDSecureInfo: ThreeDSecureInfo? = null
+        val threeDSecureInfo: ThreeDSecureInfo? = null,
+        val shippingAddress: GooglePayAddress? = null,
+        val billingAddress: GooglePayAddress? = null,
+        val googlePayEmail: String? = null,
+        val shippingOptionId: String? = null
     ) : PaymentResultModel()
 
     @Parcelize
