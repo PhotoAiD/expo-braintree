@@ -19,6 +19,8 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
   private var didHandleResult = false
   private var pendingSuccessData: (nonce: String, amount: String, currency: String, additionalData: [String: Any])?
   private var pendingError: (message: String, localizedMessage: String)?
+  private var shippingMethods: [PKShippingMethod] = []
+  private var selectedShippingMethod: PKShippingMethod?
 
   init(args: BasePaymentArgs, listener: PaymentExecutorListener?) {
     self.args = args
@@ -52,6 +54,8 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
     applePayClient = BTApplePayClient(apiClient: client)
 
     let paymentRequest = BTApplePayHelper.preparePaymentRequest(options: options)
+    shippingMethods = paymentRequest.shippingMethods ?? []
+    selectedShippingMethod = shippingMethods.first
 
     guard let paymentVC = PKPaymentAuthorizationViewController(paymentRequest: paymentRequest) else {
       handleError(
@@ -67,6 +71,43 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
     DispatchQueue.main.async {
       viewController.present(paymentVC, animated: true, completion: nil)
     }
+  }
+
+  // Express checkout: recalculate the sheet total when the user picks another
+  // delivery method
+  func paymentAuthorizationViewController(
+    _ controller: PKPaymentAuthorizationViewController,
+    didSelect shippingMethod: PKShippingMethod,
+    handler completion: @escaping (PKPaymentRequestShippingMethodUpdate) -> Void
+  ) {
+    selectedShippingMethod = shippingMethod
+    completion(PKPaymentRequestShippingMethodUpdate(paymentSummaryItems: currentSummaryItems()))
+  }
+
+  // Express checkout: the delivery method list is static, so an address change
+  // keeps the same methods and total. This is the hook for address-dependent
+  // pricing if it is ever needed. The contact is redacted by iOS before
+  // authorization (only city/state/zip/country are available here).
+  func paymentAuthorizationViewController(
+    _ controller: PKPaymentAuthorizationViewController,
+    didSelectShippingContact contact: PKContact,
+    handler completion: @escaping (PKPaymentRequestShippingContactUpdate) -> Void
+  ) {
+    completion(PKPaymentRequestShippingContactUpdate(
+      errors: nil,
+      paymentSummaryItems: currentSummaryItems(),
+      shippingMethods: shippingMethods
+    ))
+  }
+
+  private func currentSummaryItems() -> [PKPaymentSummaryItem] {
+    guard case .applePay(let options) = args.paymentMethod else {
+      return []
+    }
+    return BTApplePayHelper.prepareSummaryItems(
+      options: options,
+      shippingMethod: selectedShippingMethod
+    )
   }
 
   func paymentAuthorizationViewController(
@@ -112,6 +153,14 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
         if case .applePay(let options) = self.args.paymentMethod {
           amount = options["totalAmount"] as? String ?? "0"
           currency = options["currencyCode"] as? String ?? "USD"
+
+          // Express checkout: the authorized total includes the delivery price
+          if let shippingMethod = payment.shippingMethod ?? self.selectedShippingMethod {
+            amount = BTApplePayHelper.totalWithShipping(
+              baseAmount: amount,
+              shippingMethod: shippingMethod
+            ).stringValue
+          }
         }
 
         // Store success data to send after sheet dismisses
@@ -163,5 +212,7 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
     didHandleResult = false
     pendingSuccessData = nil
     pendingError = nil
+    shippingMethods = []
+    selectedShippingMethod = nil
   }
 }

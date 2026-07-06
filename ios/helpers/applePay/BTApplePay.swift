@@ -50,29 +50,18 @@ class BTApplePayHelper: NSObject {
       request.currencyCode = "USD"
     }
 
-    // Set payment summary items
-    var paymentSummaryItems: [PKPaymentSummaryItem] = []
-
-    if let items = options["items"] as? [[String: Any]] {
-      for item in items {
-        if let label = item["label"] as? String,
-           let amountString = item["amount"] as? String,
-           let amount = NSDecimalNumber(string: amountString) as NSDecimalNumber? {
-          let summaryItem = PKPaymentSummaryItem(label: label, amount: amount)
-          paymentSummaryItems.append(summaryItem)
-        }
-      }
+    // Express checkout: selectable delivery methods. Apple Pay pre-selects the
+    // first method in the array, so the default is moved to the front.
+    let shippingMethods = prepareShippingMethods(options: options)
+    if !shippingMethods.isEmpty {
+      request.shippingMethods = shippingMethods
+      request.shippingType = shippingType(from: options["shippingType"] as? String)
     }
 
-    // Add total amount
-    if let companyName = options["companyName"] as? String,
-       let totalAmount = options["totalAmount"] as? String,
-       let amount = NSDecimalNumber(string: totalAmount) as NSDecimalNumber? {
-      let totalItem = PKPaymentSummaryItem(label: companyName, amount: amount)
-      paymentSummaryItems.append(totalItem)
-    }
-
-    request.paymentSummaryItems = paymentSummaryItems
+    request.paymentSummaryItems = prepareSummaryItems(
+      options: options,
+      shippingMethod: shippingMethods.first
+    )
 
     // Set additional options
     if let requiredBillingContactFields = options["requiredBillingContactFields"] as? [String] {
@@ -113,7 +102,112 @@ class BTApplePayHelper: NSObject {
       request.requiredShippingContactFields = contactFields
     }
 
+    // Express checkout needs the shipping address to be collected
+    if !shippingMethods.isEmpty {
+      request.requiredShippingContactFields.insert(.postalAddress)
+    }
+
     return request
+  }
+
+  // Build PKShippingMethods from the `shippingMethods` option. The method matching
+  // `defaultShippingMethodId` is moved to the front because Apple Pay always
+  // pre-selects the first method in the array.
+  static func prepareShippingMethods(options: [String: Any]) -> [PKShippingMethod] {
+    guard let methods = options["shippingMethods"] as? [[String: Any]] else {
+      return []
+    }
+
+    var shippingMethods: [PKShippingMethod] = []
+    for method in methods {
+      guard let id = method["id"] as? String,
+            let label = method["label"] as? String,
+            let price = method["price"] as? String else {
+        continue
+      }
+      let amount = NSDecimalNumber(string: price)
+      if amount == NSDecimalNumber.notANumber {
+        continue
+      }
+      let shippingMethod = PKShippingMethod(label: label, amount: amount)
+      shippingMethod.identifier = id
+      shippingMethod.detail = method["description"] as? String ?? ""
+      shippingMethods.append(shippingMethod)
+    }
+
+    if let defaultId = options["defaultShippingMethodId"] as? String,
+       let index = shippingMethods.firstIndex(where: { $0.identifier == defaultId }),
+       index > 0 {
+      let defaultMethod = shippingMethods.remove(at: index)
+      shippingMethods.insert(defaultMethod, at: 0)
+    }
+
+    return shippingMethods
+  }
+
+  // Build the payment summary items, adding the selected delivery method as a
+  // line item and folding its price into the grand total. Also used by the
+  // executor to refresh the sheet when the user picks another method.
+  static func prepareSummaryItems(
+    options: [String: Any],
+    shippingMethod: PKShippingMethod?
+  ) -> [PKPaymentSummaryItem] {
+    var paymentSummaryItems: [PKPaymentSummaryItem] = []
+
+    if let items = options["items"] as? [[String: Any]] {
+      for item in items {
+        if let label = item["label"] as? String,
+           let amountString = item["amount"] as? String,
+           let amount = NSDecimalNumber(string: amountString) as NSDecimalNumber? {
+          let summaryItem = PKPaymentSummaryItem(label: label, amount: amount)
+          paymentSummaryItems.append(summaryItem)
+        }
+      }
+    }
+
+    if let shippingMethod = shippingMethod {
+      paymentSummaryItems.append(
+        PKPaymentSummaryItem(label: shippingMethod.label, amount: shippingMethod.amount)
+      )
+    }
+
+    // Total (must be the last summary item)
+    if let companyName = options["companyName"] as? String,
+       let totalAmount = options["totalAmount"] as? String {
+      let totalItem = PKPaymentSummaryItem(
+        label: companyName,
+        amount: totalWithShipping(baseAmount: totalAmount, shippingMethod: shippingMethod)
+      )
+      paymentSummaryItems.append(totalItem)
+    }
+
+    return paymentSummaryItems
+  }
+
+  // `baseAmount + shipping price`, falling back to the base amount when there is
+  // no delivery method or the base amount is not a valid decimal
+  static func totalWithShipping(
+    baseAmount: String,
+    shippingMethod: PKShippingMethod?
+  ) -> NSDecimalNumber {
+    let base = NSDecimalNumber(string: baseAmount)
+    guard let shippingMethod = shippingMethod, base != NSDecimalNumber.notANumber else {
+      return base
+    }
+    return base.adding(shippingMethod.amount)
+  }
+
+  static func shippingType(from value: String?) -> PKShippingType {
+    switch value {
+    case "delivery":
+      return .delivery
+    case "storePickup":
+      return .storePickup
+    case "servicePickup":
+      return .servicePickup
+    default:
+      return .shipping
+    }
   }
 
   // Tokenize Apple Pay payment
@@ -161,6 +255,11 @@ class BTApplePayHelper: NSObject {
         response["paymentMethodDisplayName"] = token.paymentMethod.displayName ?? ""
         response["paymentMethodNetwork"] = token.paymentMethod.network?.rawValue ?? ""
         response["transactionIdentifier"] = token.transactionIdentifier
+      }
+
+      // Add selected delivery method (express checkout)
+      if let shippingMethodId = payment.shippingMethod?.identifier {
+        response["shippingMethodId"] = shippingMethodId
       }
 
       // Add billing contact if available

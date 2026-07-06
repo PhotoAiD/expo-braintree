@@ -87,6 +87,18 @@ export type ApplePaySummaryItem = {
 };
 export type ApplePayContactField = 'postalAddress' | 'phone' | 'email' | 'name';
 export type ApplePayNetwork = 'visa' | 'masterCard' | 'amex' | 'discover';
+/**
+ * A selectable delivery method shown inside the Apple Pay sheet during express
+ * checkout. The sheet total recalculates live as the user picks a method.
+ */
+export type ApplePayShippingMethod = {
+    id: string;
+    label: string;
+    description?: string;
+    price: string;
+};
+/** How the Apple Pay sheet labels the shipping section. */
+export type ApplePayShippingType = 'shipping' | 'delivery' | 'storePickup' | 'servicePickup';
 export type ApplePayOptions = {
     clientToken: string;
     merchantId: string;
@@ -97,6 +109,9 @@ export type ApplePayOptions = {
     items?: ApplePaySummaryItem[];
     requiredBillingContactFields?: ApplePayContactField[];
     requiredShippingContactFields?: ApplePayContactField[];
+    shippingMethods?: ApplePayShippingMethod[];
+    defaultShippingMethodId?: string;
+    shippingType?: ApplePayShippingType;
 };
 export type ApplePayCanMakePaymentsOptions = {
     networks?: ApplePayNetwork[];
@@ -134,6 +149,7 @@ export type ApplePayNonceResult = {
     transactionIdentifier?: string;
     billingContact?: ApplePayContactInfo;
     shippingContact?: ApplePayContactInfo;
+    shippingMethodId?: string;
 };
 /**
  * A selectable delivery method shown inside the Google Pay sheet during express
@@ -154,13 +170,9 @@ export type GooglePayOptions = {
     amount: string;
     currencyCode?: string;
     merchantName?: string;
-    /** Whether Google Pay collects a shipping address. Defaults to true. */
     isShippingAddressRequired?: boolean;
-    /** Whether a phone number is collected with the shipping address. Defaults to false. */
     isPhoneNumberRequired?: boolean;
-    /** Whether Google Pay collects a billing address. Defaults to false. */
     isBillingAddressRequired?: boolean;
-    /** Whether the payer's email is returned in the result. Defaults to false. */
     isEmailRequired?: boolean;
     /**
      * Delivery methods to present inside the Google Pay sheet (express checkout).

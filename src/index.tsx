@@ -33,6 +33,110 @@ const ExpoBraintree = NativeModules.ExpoBraintree
       }
     );
 
+const PRICE_PATTERN = /^\d+(\.\d+)?$/;
+
+type ShippingEntryFieldName = 'shippingMethods' | 'shippingOptions';
+
+/** Shared shape of ApplePayShippingMethod and GooglePayShippingOption. */
+type ShippingEntry = {
+  id: string;
+  label: string;
+  description?: string;
+  price: string;
+};
+
+function createShippingValidationError(
+  fieldName: ShippingEntryFieldName,
+  message: string
+): BTPayPalError {
+  return {
+    code:
+      fieldName === 'shippingMethods'
+        ? 'INVALID_SHIPPING_METHODS'
+        : 'INVALID_SHIPPING_OPTIONS',
+    message,
+    domain: 'expo-braintree',
+  };
+}
+
+/**
+ * Validates express-checkout delivery entries before they cross the bridge.
+ * Native code on both platforms would otherwise skip malformed entries or
+ * treat an unparseable price as zero, silently dropping the delivery fee
+ * from the total.
+ */
+function validateShippingEntries(
+  fieldName: ShippingEntryFieldName,
+  entries: ShippingEntry[] | undefined,
+  defaultFieldName: 'defaultShippingMethodId' | 'defaultShippingOptionId',
+  defaultId: string | undefined
+): BTPayPalError | undefined {
+  if (entries === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(entries)) {
+    return createShippingValidationError(
+      fieldName,
+      `${fieldName} must be an array`
+    );
+  }
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  const seenIds = new Set<string>();
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (typeof entry !== 'object' || entry === null) {
+      return createShippingValidationError(
+        fieldName,
+        `${fieldName}[${i}] must be an object`
+      );
+    }
+    const { id, label, description, price } = entry;
+    if (typeof id !== 'string' || id.length === 0) {
+      return createShippingValidationError(
+        fieldName,
+        `${fieldName}[${i}].id must be a non-empty string`
+      );
+    }
+    if (seenIds.has(id)) {
+      return createShippingValidationError(
+        fieldName,
+        `${fieldName}[${i}].id "${id}" is already used by another entry`
+      );
+    }
+    seenIds.add(id);
+    if (typeof label !== 'string' || label.length === 0) {
+      return createShippingValidationError(
+        fieldName,
+        `${fieldName}[${i}].label must be a non-empty string`
+      );
+    }
+    if (description !== undefined && typeof description !== 'string') {
+      return createShippingValidationError(
+        fieldName,
+        `${fieldName}[${i}].description must be a string`
+      );
+    }
+    if (typeof price !== 'string' || !PRICE_PATTERN.test(price)) {
+      return createShippingValidationError(
+        fieldName,
+        `${fieldName}[${i}].price must be a decimal string like "5.00" (got ${JSON.stringify(price)})`
+      );
+    }
+  }
+
+  if (defaultId !== undefined && !seenIds.has(defaultId)) {
+    return createShippingValidationError(
+      fieldName,
+      `${defaultFieldName} "${defaultId}" does not match any ${fieldName} entry id`
+    );
+  }
+
+  return undefined;
+}
+
 export async function requestBillingAgreement(
   options: RequestBillingAgreementOptions
 ): Promise<BTPayPalAccountNonceResult | BTPayPalError> {
@@ -132,6 +236,15 @@ export async function presentApplePaymentSheet(
       domain: undefined,
     } as BTPayPalError;
   }
+  const validationError = validateShippingEntries(
+    'shippingMethods',
+    options.shippingMethods,
+    'defaultShippingMethodId',
+    options.defaultShippingMethodId
+  );
+  if (validationError) {
+    return validationError;
+  }
   try {
     const result: ApplePayNonceResult =
       await ExpoBraintree.presentApplePaymentSheet(options);
@@ -185,6 +298,15 @@ export async function requestGooglePayPayment(
       message: 'Google Pay is only available on Android',
       domain: undefined,
     } as BTPayPalError;
+  }
+  const validationError = validateShippingEntries(
+    'shippingOptions',
+    options.shippingOptions,
+    'defaultShippingOptionId',
+    options.defaultShippingOptionId
+  );
+  if (validationError) {
+    return validationError;
   }
   try {
     const result: GooglePayNonceResult =
