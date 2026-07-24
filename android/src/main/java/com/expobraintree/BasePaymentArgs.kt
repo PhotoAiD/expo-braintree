@@ -7,7 +7,14 @@ sealed class PaymentMethod : Parcelable {
     @Parcelize
     data class PayPalCheckout(
         val amount: String,
-        val currency: String
+        val currency: String,
+        val intent: String? = null,
+        val userAction: String? = null,
+        val offerPayLater: Boolean = false,
+        val requestBillingAgreement: Boolean = false,
+        val isShippingAddressRequired: Boolean = false,
+        val isShippingAddressEditable: Boolean = false,
+        val shippingCallbackUrl: String? = null
     ) : PaymentMethod()
 
     @Parcelize

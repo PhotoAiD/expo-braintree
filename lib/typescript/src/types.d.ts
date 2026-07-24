@@ -25,11 +25,42 @@ export type RequestBillingAgreementOptions = {
 export type RequestOneTimePaymentOptions = {
     amount: string;
     intent?: BTPayPalCheckoutIntent;
+    /**
+     * Controls the final button in the PayPal sheet. The default shows
+     * "Continue", meaning the final amount is confirmed in-app after return.
+     * Use `payNow` when the sheet total is the final charge — mandatory with
+     * `shippingCallbackUrl`: PayPal fires shipping callbacks only in the
+     * Pay Now flow, and the sheet total is then amount + selected shipping.
+     */
     userAction?: BTPayPalRequestUserAction;
     offerPayLater?: BoolValue;
     currencyCode?: string;
     requestBillingAgreement?: BoolValue;
     clientToken: string;
+    /**
+     * When true, the buyer's shipping address is collected in the PayPal sheet
+     * and returned as `shippingAddress` in the result (express checkout).
+     */
+    isShippingAddressRequired?: boolean;
+    /**
+     * Lets the buyer pick a different shipping address inside the PayPal sheet.
+     * Only relevant when isShippingAddressRequired is true.
+     */
+    isShippingAddressEditable?: boolean;
+    /**
+     * HTTPS URL of a server endpoint PayPal calls when the buyer changes the
+     * shipping address or shipping option inside the PayPal sheet, so shipping
+     * options and updated amounts can be served directly in the sheet.
+     * The endpoint must implement Braintree's PayPal shipping-callback contract
+     * (public HTTPS, no redirects, 200 with the documented JSON schema) and its
+     * domain must be registered per environment in the Braintree Control Panel
+     * (Settings → Processing → PayPal → Options → Shipping Callback Domains).
+     * One-time checkout only, and only in the Pay Now flow with
+     * `isShippingAddressRequired` and `isShippingAddressEditable` set — under
+     * `userAction: none` (Continue) or with shipping disabled, PayPal silently
+     * sends no callbacks. Invalid URLs are silently ignored.
+     */
+    shippingCallbackUrl?: string;
 };
 export type TokenizeCardOptions = {
     number: string;
@@ -62,6 +93,7 @@ export type BTPayPalAccountNonceResult = {
     nonce: string;
     firstName?: string;
     lastName?: string;
+    phone?: string;
     billingAddress?: BTPayPalAccountNonceAddressResult;
     shippingAddress?: BTPayPalAccountNonceAddressResult;
 };

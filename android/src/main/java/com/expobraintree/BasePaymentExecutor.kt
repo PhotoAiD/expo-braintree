@@ -42,7 +42,12 @@ abstract class BasePaymentExecutor(
         shippingAddress: GooglePayAddress? = null,
         billingAddress: GooglePayAddress? = null,
         googlePayEmail: String? = null,
-        shippingOptionId: String? = null
+        shippingOptionId: String? = null,
+        payPalEmail: String? = null,
+        payerId: String? = null,
+        firstName: String? = null,
+        lastName: String? = null,
+        phone: String? = null
     ) {
         Log.d(TAG, "[Success] paymentType=$paymentType, amount=$amount, currency=$currency, noncePresent=${nonce.isNotEmpty()}, 3dsInfo=$threeDSecureInfo")
         listener.onPaymentResult(
@@ -57,7 +62,12 @@ abstract class BasePaymentExecutor(
                 shippingAddress = shippingAddress,
                 billingAddress = billingAddress,
                 googlePayEmail = googlePayEmail,
-                shippingOptionId = shippingOptionId
+                shippingOptionId = shippingOptionId,
+                payPalEmail = payPalEmail,
+                payerId = payerId,
+                firstName = firstName,
+                lastName = lastName,
+                phone = phone
             )
         )
     }

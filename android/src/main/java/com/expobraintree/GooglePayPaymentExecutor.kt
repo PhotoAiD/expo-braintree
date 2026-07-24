@@ -51,6 +51,20 @@ class GooglePayPaymentExecutor(
             context = context,
             authorization = args.clientToken
         )
+        // Seed here rather than at launch: if the host activity is recreated behind an
+        // open sheet, the old instance's onDestroy has cleared the holder and launch
+        // never runs again, so the callback service would price every option from an
+        // empty holder (total 0.00).
+        (args.paymentMethod as? PaymentMethod.GooglePay)
+            ?.takeIf { it.shippingOptions.isNotEmpty() }
+            ?.let { paymentMethod ->
+                GooglePayExpressCheckoutHolder.seed(
+                    basePrice = paymentMethod.amount,
+                    currencyCode = paymentMethod.currency,
+                    shippingOptions = paymentMethod.shippingOptions,
+                    defaultShippingOptionId = paymentMethod.defaultShippingOptionId
+                )
+            }
     }
 
     override fun requestPayment(activity: FragmentActivity) {
@@ -139,18 +153,16 @@ class GooglePayPaymentExecutor(
 
         val requestJson = if (isExpress) {
             val defaultOptionId = paymentMethod.defaultShippingOptionId ?: paymentMethod.shippingOptions.first().id
-            GooglePayExpressCheckoutHolder.seed(
-                basePrice = paymentMethod.amount,
-                currencyCode = paymentMethod.currency,
-                shippingOptions = paymentMethod.shippingOptions,
-                defaultShippingOptionId = defaultOptionId
-            )
             GooglePayExpressRequestBuilder.augment(
                 baseRequestJson = params.paymentDataRequest.toJson(),
                 options = paymentMethod.shippingOptions,
                 defaultShippingOptionId = defaultOptionId,
                 currencyCode = paymentMethod.currency,
-                totalPrice = GooglePayExpressCheckoutHolder.totalForOption(defaultOptionId)
+                totalPrice = GooglePayExpressCheckoutHolder.totalFor(
+                    paymentMethod.amount,
+                    paymentMethod.shippingOptions,
+                    defaultOptionId
+                )
             )
         } else {
             params.paymentDataRequest.toJson()
@@ -237,7 +249,7 @@ class GooglePayPaymentExecutor(
         val paymentMethod = args.paymentMethod as PaymentMethod.GooglePay
         val cardNonce = nonce as? GooglePayCardNonce
         val finalAmount = selectedShippingOptionId
-            ?.let { GooglePayExpressCheckoutHolder.totalForOption(it) }
+            ?.let { GooglePayExpressCheckoutHolder.totalFor(paymentMethod.amount, paymentMethod.shippingOptions, it) }
             ?: paymentMethod.amount
 
         handleSuccess(

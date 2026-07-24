@@ -11,9 +11,11 @@ import com.braintreepayments.api.paypal.PayPalLauncher
 import com.braintreepayments.api.paypal.PayPalPaymentAuthRequest
 import com.braintreepayments.api.paypal.PayPalPaymentAuthResult
 import com.braintreepayments.api.paypal.PayPalPaymentIntent
+import com.braintreepayments.api.paypal.PayPalPaymentUserAction
 import com.braintreepayments.api.paypal.PayPalPendingRequest
 import com.braintreepayments.api.paypal.PayPalResult
 import com.braintreepayments.api.paypal.PayPalVaultRequest
+import com.braintreepayments.api.core.PostalAddress
 
 class PayPalPaymentExecutor(
     private val context: Context,
@@ -58,14 +60,28 @@ class PayPalPaymentExecutor(
             return
         }
 
-        Log.d(TAG, "[requestCheckoutPayment] amount=${paymentMethod.amount}, currency=${paymentMethod.currency}")
+        Log.d(TAG, "[requestCheckoutPayment] amount=${paymentMethod.amount}, currency=${paymentMethod.currency}, isShippingAddressRequired=${paymentMethod.isShippingAddressRequired}")
 
         val request = PayPalCheckoutRequest(
             amount = paymentMethod.amount,
             hasUserLocationConsent = false
         )
         request.currencyCode = paymentMethod.currency
-        request.intent = PayPalPaymentIntent.AUTHORIZE
+        request.intent = when (paymentMethod.intent) {
+            "sale" -> PayPalPaymentIntent.SALE
+            "order" -> PayPalPaymentIntent.ORDER
+            else -> PayPalPaymentIntent.AUTHORIZE
+        }
+        if (paymentMethod.userAction == "payNow") {
+            request.userAction = PayPalPaymentUserAction.USER_ACTION_COMMIT
+        }
+        request.shouldOfferPayLater = paymentMethod.offerPayLater
+        request.shouldRequestBillingAgreement = paymentMethod.requestBillingAgreement
+        request.isShippingAddressRequired = paymentMethod.isShippingAddressRequired
+        request.isShippingAddressEditable = paymentMethod.isShippingAddressEditable
+        paymentMethod.shippingCallbackUrl?.takeIf { it.isNotEmpty() }?.let {
+            request.shippingCallbackUrl = it.toUri()
+        }
 
         payPalClient.createPaymentAuthRequest(activity, request) { paymentAuthRequest ->
             Log.d(TAG, "[requestCheckoutPayment] createPaymentAuthRequest callback")
@@ -170,11 +186,19 @@ class PayPalPaymentExecutor(
                         else -> "USD"
                     }
 
+                    val accountNonce = payPalResult.nonce
                     handleSuccess(
-                        nonce = payPalResult.nonce.string,
+                        nonce = accountNonce.string,
                         amount = amount,
                         currency = currency,
-                        paymentType = "PayPal"
+                        paymentType = "PayPal",
+                        shippingAddress = convertPostalAddress(accountNonce.shippingAddress),
+                        billingAddress = convertPostalAddress(accountNonce.billingAddress),
+                        payPalEmail = accountNonce.email,
+                        payerId = accountNonce.payerId,
+                        firstName = accountNonce.firstName,
+                        lastName = accountNonce.lastName,
+                        phone = accountNonce.phone
                     )
                 }
                 is PayPalResult.Failure -> {
@@ -189,6 +213,20 @@ class PayPalPaymentExecutor(
                 }
             }
         }
+    }
+
+    private fun convertPostalAddress(address: PostalAddress?): GooglePayAddress? {
+        if (address == null) return null
+        return GooglePayAddress(
+            recipientName = address.recipientName,
+            phoneNumber = address.phoneNumber,
+            streetAddress = address.streetAddress,
+            extendedAddress = address.extendedAddress,
+            locality = address.locality,
+            region = address.region,
+            postalCode = address.postalCode,
+            countryCodeAlpha2 = address.countryCodeAlpha2
+        )
     }
 
     override fun onDestroy() {

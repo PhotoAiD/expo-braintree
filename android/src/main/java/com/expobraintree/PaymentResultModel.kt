@@ -36,7 +36,12 @@ sealed class PaymentResultModel : Parcelable {
         val shippingAddress: GooglePayAddress? = null,
         val billingAddress: GooglePayAddress? = null,
         val googlePayEmail: String? = null,
-        val shippingOptionId: String? = null
+        val shippingOptionId: String? = null,
+        val payPalEmail: String? = null,
+        val payerId: String? = null,
+        val firstName: String? = null,
+        val lastName: String? = null,
+        val phone: String? = null
     ) : PaymentResultModel()
 
     @Parcelize

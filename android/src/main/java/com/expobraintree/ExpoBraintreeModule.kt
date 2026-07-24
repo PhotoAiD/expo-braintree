@@ -164,7 +164,16 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
                 clientToken = clientToken,
                 paymentMethod = PaymentMethod.PayPalCheckout(
                     amount = amount,
-                    currency = currency
+                    currency = currency,
+                    intent = data.getString("intent"),
+                    userAction = data.getString("userAction"),
+                    offerPayLater = data.getString("offerPayLater") == "true",
+                    requestBillingAgreement = data.getString("requestBillingAgreement") == "true",
+                    isShippingAddressRequired =
+                        if (data.hasKey("isShippingAddressRequired")) data.getBoolean("isShippingAddressRequired") else false,
+                    isShippingAddressEditable =
+                        if (data.hasKey("isShippingAddressEditable")) data.getBoolean("isShippingAddressEditable") else false,
+                    shippingCallbackUrl = data.getString("shippingCallbackUrl")
                 ),
                 email = email,
                 deviceData = deviceData
@@ -398,10 +407,18 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
             putString("deviceData", result.deviceData)
 
             when (result.paymentType) {
-                "PayPal" -> putString("email", result.email)
+                "PayPal" -> {
+                    putString("email", result.payPalEmail ?: result.email)
+                    result.payerId?.let { putString("payerID", it) }
+                    result.firstName?.let { putString("firstName", it) }
+                    result.lastName?.let { putString("lastName", it) }
+                    result.phone?.let { putString("phone", it) }
+                    result.shippingAddress?.let { putMap("shippingAddress", addressToMap(it)) }
+                    result.billingAddress?.let { putMap("billingAddress", addressToMap(it)) }
+                }
                 "GooglePay" -> {
-                    result.shippingAddress?.let { putMap("shippingAddress", googlePayAddressToMap(it)) }
-                    result.billingAddress?.let { putMap("billingAddress", googlePayAddressToMap(it)) }
+                    result.shippingAddress?.let { putMap("shippingAddress", addressToMap(it)) }
+                    result.billingAddress?.let { putMap("billingAddress", addressToMap(it)) }
                     result.googlePayEmail?.let { putString("email", it) }
                     result.shippingOptionId?.let { putString("shippingOptionId", it) }
                 }
@@ -438,7 +455,7 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
         return result
     }
 
-    private fun googlePayAddressToMap(address: GooglePayAddress): WritableMap {
+    private fun addressToMap(address: GooglePayAddress): WritableMap {
         return Arguments.createMap().apply {
             putString("recipientName", address.recipientName)
             putString("phoneNumber", address.phoneNumber)

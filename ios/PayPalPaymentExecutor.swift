@@ -56,13 +56,30 @@ class PayPalPaymentExecutor: BasePaymentExecutor {
   }
 
   private func requestCheckoutPayment() {
-    guard case .payPalCheckout(let amount, let currency) = args.paymentMethod else {
+    guard
+      case .payPalCheckout(
+        let amount, let currency, let intent, let userAction, let offerPayLater,
+        let requestBillingAgreement, let isShippingAddressRequired, let isShippingAddressEditable,
+        let shippingCallbackUrl
+      ) = args.paymentMethod
+    else {
       handleError(message: "Invalid payment method", localizedMessage: "Expected PayPalCheckout")
       return
     }
 
-    let checkoutRequest = BTPayPalCheckoutRequest(amount: amount)
-    checkoutRequest.currencyCode = currency
+    let checkoutRequest = BTPayPalCheckoutRequest(
+      amount: amount,
+      intent: getBTPayPalCheckoutIntentByString(intent: intent),
+      userAction: getBTPayPalRequestUserActionByString(intent: userAction),
+      offerPayLater: offerPayLater,
+      currencyCode: currency,
+      requestBillingAgreement: requestBillingAgreement
+    )
+    checkoutRequest.isShippingAddressRequired = isShippingAddressRequired
+    checkoutRequest.isShippingAddressEditable = isShippingAddressEditable
+    if let urlString = shippingCallbackUrl, !urlString.isEmpty, let url = URL(string: urlString) {
+      checkoutRequest.shippingCallbackURL = url
+    }
 
     payPalClient?.tokenize(checkoutRequest) { [weak self] (accountNonce, error) in
       self?.handleTokenizeResult(accountNonce: accountNonce, error: error)
@@ -77,7 +94,7 @@ class PayPalPaymentExecutor: BasePaymentExecutor {
       let currency: String
 
       switch args.paymentMethod {
-      case .payPalCheckout(let amt, let curr):
+      case .payPalCheckout(let amt, let curr, _, _, _, _, _, _, _):
         amount = amt
         currency = curr
       default:
