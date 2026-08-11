@@ -30,36 +30,54 @@ private class GooglePayPaymentDataCallbacks : BasePaymentDataCallbacks() {
         request: IntermediatePaymentData?,
         onCompleteListener: OnCompleteListener<PaymentDataRequestUpdate>
     ) {
-        val holder = GooglePayExpressCheckoutHolder
-        val json = JSONObject(request?.toJson() ?: "{}")
-        val trigger = json.optString("callbackTrigger", "")
-        val selectedId = json.optJSONObject("shippingOptionData")?.optString("id")
+        // Google's contract requires exactly one complete() call; an uncaught
+        // exception here would leave the sheet spinning forever, so any failure
+        // must resolve into an error update.
+        var errorIntent = "SHIPPING_ADDRESS"
+        try {
+            val holder = GooglePayExpressCheckoutHolder
+            val json = JSONObject(request?.toJson() ?: "{}")
+            val trigger = json.optString("callbackTrigger", "")
+            if (trigger == "SHIPPING_OPTION") {
+                errorIntent = "SHIPPING_OPTION"
+            }
+            val selectedId = json.optJSONObject("shippingOptionData")?.optString("id")
 
-        // No option chosen yet on INITIALIZE / SHIPPING_ADDRESS -> fall back to default.
-        val effectiveId = if (!selectedId.isNullOrEmpty()) selectedId else holder.defaultShippingOptionId
-        val total = holder.totalForOption(effectiveId)
+            // No option chosen yet on INITIALIZE / SHIPPING_ADDRESS -> fall back to default.
+            val effectiveId = if (!selectedId.isNullOrEmpty()) selectedId else holder.defaultShippingOptionId
+            val total = holder.totalForOption(effectiveId)
 
-        Log.d(TAG, "[onPaymentDataChanged] trigger=$trigger selected=$selectedId total=$total")
+            Log.d(TAG, "[onPaymentDataChanged] trigger=$trigger selected=$selectedId total=$total")
 
-        val update = JSONObject().put(
-            "newTransactionInfo",
-            GooglePayExpressRequestBuilder.transactionInfo(holder.currencyCode, total, "ESTIMATED")
-        )
-
-        // Refresh the available options on init / address change; on a pure option
-        // change only the total needs updating.
-        if (trigger != "SHIPPING_OPTION") {
-            update.put(
-                "newShippingOptionParameters",
-                GooglePayExpressRequestBuilder.shippingOptionParameters(
-                    holder.shippingOptions,
-                    effectiveId
-                )
+            val update = JSONObject().put(
+                "newTransactionInfo",
+                GooglePayExpressRequestBuilder.transactionInfo(holder.currencyCode, total, "ESTIMATED")
             )
-        }
 
-        onCompleteListener.complete(PaymentDataRequestUpdate.fromJson(update.toString()))
+            // Refresh the available options on init / address change; on a pure option
+            // change only the total needs updating.
+            if (trigger != "SHIPPING_OPTION") {
+                update.put(
+                    "newShippingOptionParameters",
+                    GooglePayExpressRequestBuilder.shippingOptionParameters(
+                        holder.shippingOptions,
+                        effectiveId
+                    )
+                )
+            }
+
+            onCompleteListener.complete(PaymentDataRequestUpdate.fromJson(update.toString()))
+        } catch (ex: Exception) {
+            Log.e(TAG, "[onPaymentDataChanged] Failed to build update: ${ex.message}", ex)
+            onCompleteListener.complete(errorUpdate(errorIntent))
+        }
     }
+
+    /** Surfaces the failure on the sheet instead of hanging it (built from static, valid JSON). */
+    private fun errorUpdate(intent: String): PaymentDataRequestUpdate =
+        PaymentDataRequestUpdate.fromJson(
+            """{"error":{"reason":"OTHER_ERROR","message":"Unable to update delivery options. Please try again.","intent":"$intent"}}"""
+        )
 
     companion object {
         private const val TAG = "[GPayCallback]"

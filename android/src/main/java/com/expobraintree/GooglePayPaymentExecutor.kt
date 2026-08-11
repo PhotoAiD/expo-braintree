@@ -3,9 +3,9 @@ package com.expobraintree
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.IntentSender
 import android.util.Log
 import androidx.fragment.app.FragmentActivity
-import com.braintreepayments.api.core.PostalAddress
 import com.braintreepayments.api.googlepay.GooglePayCardNonce
 import com.braintreepayments.api.googlepay.GooglePayClient
 import com.braintreepayments.api.googlepay.GooglePayPaymentAuthRequest
@@ -52,9 +52,9 @@ class GooglePayPaymentExecutor(
             authorization = args.clientToken
         )
         // Seed here rather than at launch: if the host activity is recreated behind an
-        // open sheet, the old instance's onDestroy has cleared the holder and launch
-        // never runs again, so the callback service would price every option from an
-        // empty holder (total 0.00).
+        // open sheet (process death), launch never runs again, so init is the only
+        // point that can restore the holder for the callback service — otherwise it
+        // would price every option from an empty holder (total 0.00).
         (args.paymentMethod as? PaymentMethod.GooglePay)
             ?.takeIf { it.shippingOptions.isNotEmpty() }
             ?.let { paymentMethod ->
@@ -185,7 +185,12 @@ class GooglePayPaymentExecutor(
                     }
                 } else {
                     when (val ex = task.exception) {
-                        is ResolvableApiException -> ex.startResolutionForResult(activity, REQUEST_CODE_GOOGLE_PAY_EXPRESS)
+                        is ResolvableApiException -> try {
+                            ex.startResolutionForResult(activity, REQUEST_CODE_GOOGLE_PAY_EXPRESS)
+                        } catch (sendEx: IntentSender.SendIntentException) {
+                            Log.e(TAG, "[launchGooglePay] startResolutionForResult failed: ${sendEx.message}")
+                            handleError("Google Pay error", sendEx.message ?: "Could not launch Google Pay")
+                        }
                         else -> handleError("Google Pay error", ex?.message ?: "loadPaymentData failed")
                     }
                 }
@@ -247,8 +252,14 @@ class GooglePayPaymentExecutor(
 
     private fun finishWithNonce(nonce: com.braintreepayments.api.core.PaymentMethodNonce) {
         val paymentMethod = args.paymentMethod as PaymentMethod.GooglePay
-        val cardNonce = nonce as? GooglePayCardNonce
-        val finalAmount = selectedShippingOptionId
+        val cardNonce = nonce as? GooglePayCardNonce        
+        val effectiveOptionId = when {
+            selectedShippingOptionId != null -> selectedShippingOptionId
+            paymentMethod.shippingOptions.isNotEmpty() ->
+                paymentMethod.defaultShippingOptionId ?: paymentMethod.shippingOptions.first().id
+            else -> null
+        }
+        val finalAmount = effectiveOptionId
             ?.let { GooglePayExpressCheckoutHolder.totalFor(paymentMethod.amount, paymentMethod.shippingOptions, it) }
             ?: paymentMethod.amount
 
@@ -257,24 +268,10 @@ class GooglePayPaymentExecutor(
             amount = finalAmount,
             currency = paymentMethod.currency,
             paymentType = "GooglePay",
-            shippingAddress = mapAddress(cardNonce?.shippingAddress),
-            billingAddress = mapAddress(cardNonce?.billingAddress),
+            shippingAddress = cardNonce?.shippingAddress.toPaymentAddress(),
+            billingAddress = cardNonce?.billingAddress.toPaymentAddress(),
             googlePayEmail = cardNonce?.email,
-            shippingOptionId = selectedShippingOptionId
-        )
-    }
-
-    private fun mapAddress(address: PostalAddress?): GooglePayAddress? {
-        if (address == null) return null
-        return GooglePayAddress(
-            recipientName = address.recipientName,
-            phoneNumber = address.phoneNumber,
-            streetAddress = address.streetAddress,
-            extendedAddress = address.extendedAddress,
-            locality = address.locality,
-            region = address.region,
-            postalCode = address.postalCode,
-            countryCodeAlpha2 = address.countryCodeAlpha2
+            shippingOptionId = effectiveOptionId
         )
     }
 
@@ -282,10 +279,12 @@ class GooglePayPaymentExecutor(
         Log.d(TAG, "[onResume] Activity resumed")
     }
 
-    override fun onDestroy() {
-        Log.d(TAG, "[onDestroy] Cleaning up")
+    override fun onDestroy(isFinishing: Boolean) {
+        Log.d(TAG, "[onDestroy] Cleaning up, isFinishing=$isFinishing")
         hostActivity = null
-        GooglePayExpressCheckoutHolder.clear()
+        if (isFinishing) {
+            GooglePayExpressCheckoutHolder.clear()
+        }
     }
 
     companion object {

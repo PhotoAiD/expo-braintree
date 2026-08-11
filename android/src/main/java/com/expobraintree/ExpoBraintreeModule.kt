@@ -455,7 +455,7 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
         return result
     }
 
-    private fun addressToMap(address: GooglePayAddress): WritableMap {
+    private fun addressToMap(address: PaymentAddress): WritableMap {
         return Arguments.createMap().apply {
             putString("recipientName", address.recipientName)
             putString("phoneNumber", address.phoneNumber)

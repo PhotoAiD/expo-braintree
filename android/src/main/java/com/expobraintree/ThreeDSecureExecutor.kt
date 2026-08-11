@@ -128,7 +128,7 @@ class ThreeDSecureExecutor(
         Log.d(TAG, "[onResume] Activity resumed")
     }
 
-    override fun onDestroy() {
+    override fun onDestroy(isFinishing: Boolean) {
         Log.d(TAG, "[onDestroy] Cleaning up")
         threeDSecureLauncher = null
     }

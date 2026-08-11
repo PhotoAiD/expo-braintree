@@ -16,7 +16,14 @@ abstract class BasePaymentExecutor(
 
     abstract fun requestPayment(activity: FragmentActivity)
     abstract fun onResume(intent: Intent)
-    abstract fun onDestroy()
+
+    /**
+     * Called from the host activity's onDestroy. [isFinishing] distinguishes a terminal
+     * destroy (result delivered, back press) from a non-finishing one (config change,
+     * system-initiated destruction behind an open payment sheet) — process-wide state
+     * must survive the latter.
+     */
+    abstract fun onDestroy(isFinishing: Boolean)
 
     protected fun handleError(message: String?, localizedMessage: String?) {
         Log.e(TAG, "[Error] message=$message, localizedMessage=$localizedMessage")
@@ -39,8 +46,8 @@ abstract class BasePaymentExecutor(
         currency: String,
         paymentType: String,
         threeDSecureInfo: ThreeDSecureInfo? = null,
-        shippingAddress: GooglePayAddress? = null,
-        billingAddress: GooglePayAddress? = null,
+        shippingAddress: PaymentAddress? = null,
+        billingAddress: PaymentAddress? = null,
         googlePayEmail: String? = null,
         shippingOptionId: String? = null,
         payPalEmail: String? = null,

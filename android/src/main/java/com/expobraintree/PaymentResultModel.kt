@@ -1,6 +1,7 @@
 package com.expobraintree
 
 import android.os.Parcelable
+import com.braintreepayments.api.core.PostalAddress
 import kotlinx.parcelize.Parcelize
 
 @Parcelize
@@ -12,7 +13,7 @@ data class ThreeDSecureInfo(
 ) : Parcelable
 
 @Parcelize
-data class GooglePayAddress(
+data class PaymentAddress(
     val recipientName: String?,
     val phoneNumber: String?,
     val streetAddress: String?,
@@ -22,6 +23,20 @@ data class GooglePayAddress(
     val postalCode: String?,
     val countryCodeAlpha2: String?
 ) : Parcelable
+
+fun PostalAddress?.toPaymentAddress(): PaymentAddress? {
+    if (this == null) return null
+    return PaymentAddress(
+        recipientName = recipientName,
+        phoneNumber = phoneNumber,
+        streetAddress = streetAddress,
+        extendedAddress = extendedAddress,
+        locality = locality,
+        region = region,
+        postalCode = postalCode,
+        countryCodeAlpha2 = countryCodeAlpha2
+    )
+}
 
 sealed class PaymentResultModel : Parcelable {
     @Parcelize
@@ -33,8 +48,8 @@ sealed class PaymentResultModel : Parcelable {
         val email: String,
         val paymentType: String,
         val threeDSecureInfo: ThreeDSecureInfo? = null,
-        val shippingAddress: GooglePayAddress? = null,
-        val billingAddress: GooglePayAddress? = null,
+        val shippingAddress: PaymentAddress? = null,
+        val billingAddress: PaymentAddress? = null,
         val googlePayEmail: String? = null,
         val shippingOptionId: String? = null,
         val payPalEmail: String? = null,

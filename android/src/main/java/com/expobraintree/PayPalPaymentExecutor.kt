@@ -15,7 +15,6 @@ import com.braintreepayments.api.paypal.PayPalPaymentUserAction
 import com.braintreepayments.api.paypal.PayPalPendingRequest
 import com.braintreepayments.api.paypal.PayPalResult
 import com.braintreepayments.api.paypal.PayPalVaultRequest
-import com.braintreepayments.api.core.PostalAddress
 
 class PayPalPaymentExecutor(
     private val context: Context,
@@ -192,8 +191,8 @@ class PayPalPaymentExecutor(
                         amount = amount,
                         currency = currency,
                         paymentType = "PayPal",
-                        shippingAddress = convertPostalAddress(accountNonce.shippingAddress),
-                        billingAddress = convertPostalAddress(accountNonce.billingAddress),
+                        shippingAddress = accountNonce.shippingAddress.toPaymentAddress(),
+                        billingAddress = accountNonce.billingAddress.toPaymentAddress(),
                         payPalEmail = accountNonce.email,
                         payerId = accountNonce.payerId,
                         firstName = accountNonce.firstName,
@@ -215,21 +214,7 @@ class PayPalPaymentExecutor(
         }
     }
 
-    private fun convertPostalAddress(address: PostalAddress?): GooglePayAddress? {
-        if (address == null) return null
-        return GooglePayAddress(
-            recipientName = address.recipientName,
-            phoneNumber = address.phoneNumber,
-            streetAddress = address.streetAddress,
-            extendedAddress = address.extendedAddress,
-            locality = address.locality,
-            region = address.region,
-            postalCode = address.postalCode,
-            countryCodeAlpha2 = address.countryCodeAlpha2
-        )
-    }
-
-    override fun onDestroy() {
+    override fun onDestroy(isFinishing: Boolean) {
         Log.d(TAG, "[onDestroy] Cleaning up")
     }
 }

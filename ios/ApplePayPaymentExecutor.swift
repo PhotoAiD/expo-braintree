@@ -84,21 +84,6 @@ class ApplePayPaymentExecutor: NSObject, BasePaymentExecutor, PKPaymentAuthoriza
     completion(PKPaymentRequestShippingMethodUpdate(paymentSummaryItems: currentSummaryItems()))
   }
 
-  // Express checkout: the delivery method list is static, so an address change
-  // keeps the same methods and total. This is the hook for address-dependent
-  // pricing if it is ever needed. The contact is redacted by iOS before
-  // authorization (only city/state/zip/country are available here).
-  func paymentAuthorizationViewController(
-    _ controller: PKPaymentAuthorizationViewController,
-    didSelectShippingContact contact: PKContact,
-    handler completion: @escaping (PKPaymentRequestShippingContactUpdate) -> Void
-  ) {
-    completion(PKPaymentRequestShippingContactUpdate(
-      errors: nil,
-      paymentSummaryItems: currentSummaryItems(),
-      shippingMethods: shippingMethods
-    ))
-  }
 
   private func currentSummaryItems() -> [PKPaymentSummaryItem] {
     guard case .applePay(let options) = args.paymentMethod else {

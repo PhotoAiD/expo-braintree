@@ -132,7 +132,7 @@ class BraintreePaymentActivity : AppCompatActivity(), PaymentExecutorListener {
 
     override fun onDestroy() {
         Log.d(TAG, "[onDestroy] Activity destroyed, isFinishing=$isFinishing")
-        paymentExecutor?.onDestroy()
+        paymentExecutor?.onDestroy(isFinishing)
         super.onDestroy()
     }
 
