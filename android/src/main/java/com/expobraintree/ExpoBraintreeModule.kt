@@ -252,6 +252,7 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
                 if (data.hasKey("isEmailRequired")) data.getBoolean("isEmailRequired") else false
             val shippingOptions = parseShippingOptions(data.getArray("shippingOptions"))
             val defaultShippingOptionId = data.getString("defaultShippingOptionId")
+            val totalPriceLabel = data.getString("totalPriceLabel")
 
             val paymentArgs = BasePaymentArgs(
                 clientToken = clientToken,
@@ -264,7 +265,8 @@ class ExpoBraintreeModule(private val reactContext: ReactApplicationContext) :
                     isBillingAddressRequired = isBillingAddressRequired,
                     isEmailRequired = isEmailRequired,
                     shippingOptions = shippingOptions,
-                    defaultShippingOptionId = defaultShippingOptionId
+                    defaultShippingOptionId = defaultShippingOptionId,
+                    totalPriceLabel = totalPriceLabel
                 ),
                 email = email,
                 deviceData = deviceData

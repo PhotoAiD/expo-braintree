@@ -26,7 +26,8 @@ object GooglePayExpressRequestBuilder {
         options: List<GooglePayShippingOption>,
         defaultShippingOptionId: String?,
         currencyCode: String,
-        totalPrice: String
+        totalPrice: String,
+        totalPriceLabel: String? = null
     ): String {
         val root = JSONObject(baseRequestJson)
 
@@ -36,7 +37,7 @@ object GooglePayExpressRequestBuilder {
         root.put("callbackIntents", JSONArray(listOf("SHIPPING_ADDRESS", "SHIPPING_OPTION")))
         root.put(
             "transactionInfo",
-            transactionInfo(currencyCode, totalPrice, "ESTIMATED")
+            transactionInfo(currencyCode, totalPrice, "ESTIMATED", totalPriceLabel)
         )
 
         return root.toString()
@@ -66,13 +67,21 @@ object GooglePayExpressRequestBuilder {
             .put("shippingOptions", array)
     }
 
-    /** `transactionInfo` object used both in the request and in callback responses. */
+    /**
+     * `transactionInfo` object used both in the request and in callback responses.
+     * Without a `totalPriceLabel` the sheet renders a non-localized default ("Final")
+     * next to the total, so callers should pass a localized label.
+     */
     fun transactionInfo(
         currencyCode: String,
         totalPrice: String,
-        totalPriceStatus: String
+        totalPriceStatus: String,
+        totalPriceLabel: String? = null
     ): JSONObject = JSONObject()
         .put("totalPriceStatus", totalPriceStatus)
         .put("totalPrice", totalPrice)
         .put("currencyCode", currencyCode)
+        .apply {
+            if (!totalPriceLabel.isNullOrEmpty()) put("totalPriceLabel", totalPriceLabel)
+        }
 }

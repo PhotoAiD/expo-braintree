@@ -62,7 +62,8 @@ class GooglePayPaymentExecutor(
                     basePrice = paymentMethod.amount,
                     currencyCode = paymentMethod.currency,
                     shippingOptions = paymentMethod.shippingOptions,
-                    defaultShippingOptionId = paymentMethod.defaultShippingOptionId
+                    defaultShippingOptionId = paymentMethod.defaultShippingOptionId,
+                    totalPriceLabel = paymentMethod.totalPriceLabel
                 )
             }
     }
@@ -162,7 +163,8 @@ class GooglePayPaymentExecutor(
                     paymentMethod.amount,
                     paymentMethod.shippingOptions,
                     defaultOptionId
-                )
+                ),
+                totalPriceLabel = paymentMethod.totalPriceLabel
             )
         } else {
             params.paymentDataRequest.toJson()

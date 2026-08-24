@@ -51,7 +51,7 @@ private class GooglePayPaymentDataCallbacks : BasePaymentDataCallbacks() {
 
             val update = JSONObject().put(
                 "newTransactionInfo",
-                GooglePayExpressRequestBuilder.transactionInfo(holder.currencyCode, total, "ESTIMATED")
+                GooglePayExpressRequestBuilder.transactionInfo(holder.currencyCode, total, "ESTIMATED", holder.totalPriceLabel)
             )
 
             // Refresh the available options on init / address change; on a pure option

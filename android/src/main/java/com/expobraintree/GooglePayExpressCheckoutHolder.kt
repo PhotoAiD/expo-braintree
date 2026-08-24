@@ -33,16 +33,22 @@ object GooglePayExpressCheckoutHolder {
     var defaultShippingOptionId: String? = null
         private set
 
+    @Volatile
+    var totalPriceLabel: String? = null
+        private set
+
     fun seed(
         basePrice: String,
         currencyCode: String,
         shippingOptions: List<GooglePayShippingOption>,
-        defaultShippingOptionId: String?
+        defaultShippingOptionId: String?,
+        totalPriceLabel: String? = null
     ) {
         this.basePrice = basePrice
         this.currencyCode = currencyCode
         this.shippingOptions = shippingOptions
         this.defaultShippingOptionId = defaultShippingOptionId ?: shippingOptions.firstOrNull()?.id
+        this.totalPriceLabel = totalPriceLabel
     }
 
     fun clear() {
@@ -50,6 +56,7 @@ object GooglePayExpressCheckoutHolder {
         currencyCode = "USD"
         shippingOptions = emptyList()
         defaultShippingOptionId = null
+        totalPriceLabel = null
     }
 
     fun optionById(id: String?): GooglePayShippingOption? =

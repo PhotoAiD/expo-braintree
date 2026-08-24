@@ -241,6 +241,12 @@ export type GooglePayOptions = {
   shippingOptions?: GooglePayShippingOption[];
   /** Id of the shipping option selected by default. */
   defaultShippingOptionId?: string;
+  /**
+   * Label shown next to the total in the itemized sheet (express checkout).
+   * Without it Google Pay renders a non-localized default ("Final"). Only
+   * applies together with `shippingOptions` — the compact sheet has no total row.
+   */
+  totalPriceLabel?: string;
 };
 
 export type GooglePayAddressResult = BTPayPalAccountNonceAddressResult & {

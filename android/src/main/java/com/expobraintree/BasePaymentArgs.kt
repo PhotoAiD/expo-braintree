@@ -45,6 +45,7 @@ sealed class PaymentMethod : Parcelable {
         val isEmailRequired: Boolean = false,
         val shippingOptions: List<GooglePayShippingOption> = emptyList(),
         val defaultShippingOptionId: String? = null,
+        val totalPriceLabel: String? = null,
     ) : PaymentMethod()
 
     @Parcelize
