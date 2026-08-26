@@ -9,7 +9,17 @@ import Foundation
 
 enum PaymentMethod {
   case payPalVault(billingAgreementDescription: String?)
-  case payPalCheckout(amount: String, currency: String)
+  case payPalCheckout(
+    amount: String,
+    currency: String,
+    intent: String?,
+    userAction: String?,
+    offerPayLater: Bool,
+    requestBillingAgreement: Bool,
+    isShippingAddressRequired: Bool,
+    isShippingAddressEditable: Bool,
+    shippingCallbackUrl: String?
+  )
   case card(
     cardNumber: String,
     expirationMonth: String,

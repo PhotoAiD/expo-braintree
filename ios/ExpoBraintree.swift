@@ -47,7 +47,19 @@ class ExpoBraintree: NSObject, PaymentExecutorListener {
 
     let args = BasePaymentArgs(
       clientToken: clientToken,
-      paymentMethod: .payPalCheckout(amount: amount, currency: currency),
+      paymentMethod: .payPalCheckout(
+        amount: amount,
+        currency: currency,
+        intent: options["intent"] as? String,
+        userAction: options["userAction"] as? String,
+        offerPayLater: getBoolValueByString(
+          value: options["offerPayLater"] as? String, defaultValue: false),
+        requestBillingAgreement: getBoolValueByString(
+          value: options["requestBillingAgreement"] as? String, defaultValue: false),
+        isShippingAddressRequired: options["isShippingAddressRequired"] as? Bool ?? false,
+        isShippingAddressEditable: options["isShippingAddressEditable"] as? Bool ?? false,
+        shippingCallbackUrl: options["shippingCallbackUrl"] as? String
+      ),
       email: options["email"] as? String ?? "",
       deviceData: options["deviceData"] as? String ?? ""
     )

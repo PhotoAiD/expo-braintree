@@ -1,3 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="com.expobraintree">
+
+    <application>
+        <!--
+          Google Pay dynamic price-update callback service (express checkout).
+          Google Play Services binds to it when a PaymentDataRequest declares
+          callbackIntents. Requires play-services-wallet 20.0.0+.
+        -->
+        <service
+            android:name=".GooglePayCallbackService"
+            android:permission="com.google.android.gms.permission.BIND_PAYMENTS_CALLBACK_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wallet.callback.PAYMENT_DATA_CALLBACKS" />
+            </intent-filter>
+        </service>
+    </application>
 </manifest>

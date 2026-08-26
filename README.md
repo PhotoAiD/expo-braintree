@@ -205,6 +205,62 @@ const result: BTPayPalAccountNonceResult | BTPayPalError  = await requestOneTime
 
 ```
 
+##### PayPal Express Checkout (shipping selected in-app)
+
+Collect the buyer's PayPal shipping address during checkout, then finish the
+order in your own UI (shipping method picker, order review) before charging
+the final amount server-side. Leave `userAction` unset so the PayPal sheet
+shows a "Continue" button — the buyer confirms the final total in your app.
+
+```javascript
+import {
+  requestOneTimePayment,
+} from "expo-braintree";
+
+const result = await requestOneTimePayment({
+    clientToken: 'Token',
+    amount: '5.0', // pre-shipping total shown in the PayPal sheet
+    currencyCode: 'USD',
+    isShippingAddressRequired: true,
+    })
+
+// result.shippingAddress -> buyer's PayPal shipping address
+// Show your shipping options, then charge base + shipping via transaction.sale
+```
+
+###### Shipping options inside the PayPal sheet (server-side shipping callbacks)
+
+Alternatively, let the buyer pick the shipping option directly in the PayPal
+sheet by passing `shippingCallbackUrl`. PayPal POSTs to that HTTPS endpoint
+whenever the buyer changes the shipping address or shipping option, and your
+server responds with updated shipping options and amounts (Braintree's
+[PayPal Shipping Module](https://developer.paypal.com/braintree/docs/guides/paypal/features/shipping_module/javascript/v3/)
+contract). The endpoint's domain must be registered in the Braintree Control
+Panel (sandbox and production). Available for `requestOneTimePayment` only.
+
+PayPal fires the callbacks only in the Pay Now flow with an editable shipping
+address, so `userAction: payNow`, `isShippingAddressRequired: true` and
+`isShippingAddressEditable: true` are all required — with any of them missing
+PayPal silently sends no callbacks. The sheet total is then the final charge
+(`amount` + the shipping option selected in the sheet).
+
+```javascript
+import {
+  BTPayPalRequestUserAction,
+  requestOneTimePayment,
+} from "expo-braintree";
+
+const result = await requestOneTimePayment({
+    clientToken: 'Token',
+    amount: '5.0',
+    currencyCode: 'USD',
+    userAction: BTPayPalRequestUserAction.payNow,
+    isShippingAddressRequired: true,
+    isShippingAddressEditable: true,
+    shippingCallbackUrl: 'https://your-server.example/paypal/shipping-callback',
+    })
+```
+
 ##### Card tokenization
 ```javascript
 import {

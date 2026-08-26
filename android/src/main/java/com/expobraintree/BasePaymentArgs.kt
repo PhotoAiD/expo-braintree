@@ -7,7 +7,14 @@ sealed class PaymentMethod : Parcelable {
     @Parcelize
     data class PayPalCheckout(
         val amount: String,
-        val currency: String
+        val currency: String,
+        val intent: String? = null,
+        val userAction: String? = null,
+        val offerPayLater: Boolean = false,
+        val requestBillingAgreement: Boolean = false,
+        val isShippingAddressRequired: Boolean = false,
+        val isShippingAddressEditable: Boolean = false,
+        val shippingCallbackUrl: String? = null
     ) : PaymentMethod()
 
     @Parcelize
@@ -31,7 +38,14 @@ sealed class PaymentMethod : Parcelable {
     data class GooglePay(
         val amount: String,
         val currency: String,
-        val merchantName: String
+        val merchantName: String,
+        val isShippingAddressRequired: Boolean = false,
+        val isPhoneNumberRequired: Boolean = false,
+        val isBillingAddressRequired: Boolean = false,
+        val isEmailRequired: Boolean = false,
+        val shippingOptions: List<GooglePayShippingOption> = emptyList(),
+        val defaultShippingOptionId: String? = null,
+        val totalPriceLabel: String? = null,
     ) : PaymentMethod()
 
     @Parcelize
@@ -42,6 +56,14 @@ sealed class PaymentMethod : Parcelable {
         val currency: String = ""
     ) : PaymentMethod()
 }
+
+@Parcelize
+data class GooglePayShippingOption(
+    val id: String,
+    val label: String,
+    val description: String?,
+    val price: String
+) : Parcelable
 
 @Parcelize
 data class BasePaymentArgs(
